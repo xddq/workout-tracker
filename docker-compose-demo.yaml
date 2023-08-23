@@ -1,0 +1,35 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:15.3-bullseye
+    restart: always
+    environment:
+      - POSTGRES_DB=psql
+      - POSTGRES_USER=psql
+      - POSTGRES_PASSWORD=psql
+    networks:
+      - internal
+
+  app:
+    build:
+      dockerfile: spending-app-dockerfile
+    command: [
+        # wait for postgres to be up
+        "./wait-for-it.sh",
+        "postgres:5432",
+        "--strict",
+        "--",
+        "./run-app-demo.sh",
+      ]
+    networks:
+      - internal
+      - nginx-proxy-manager
+
+networks:
+  # name of your reverse proxy network
+  nginx-proxy-manager:
+    external: true
+    name: nginx-proxy-manager
+  # used so services can communicate with each other
+  internal:

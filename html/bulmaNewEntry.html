@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Hello Bulma!</title>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css"
+    />
+  </head>
+  <body>
+    <section class="section">
+      <div class="container">
+        <h1 class="title">Eintrag hinzufügen</h1>
+        <form target="_self" action="/api/add-entry" method="post">
+          <div class="field">
+            <label class="label">Beschreibung des Einkaufs</label>
+            <div class="control">
+              <input class="input" type="text" name="title" required />
+            </div>
+          </div>
+          <div class="field">
+            <label class="label">Wer hat gezahlt</label>
+            <div class="control">
+              <input class="input" type="text" name="whoPayed" required />
+            </div>
+          </div>
+          <div class="field">
+            <label class="label">Preis in Euro (Z.b. 5.30 für 5.30€)</label>
+            <div class="control">
+              <input
+                class="input"
+                type="number"
+                name="priceInEuro"
+                placeholder="1.0"
+                step="0.01"
+                min="0"
+                required
+              />
+            </div>
+          </div>
+          <div class="field">
+            <label class="label">
+              Datum (Korrektes Format ist z.b. 26.03.2023 oder 26.3.2023)</label
+            >
+            <div class="control">
+              <input
+                class="input"
+                type="text"
+                id="dateInput"
+                name="date"
+                pattern="(0[1-9]|[1-2][0-9]|3[0-1])\\.(0[1-9]|1[0-2])\\.20[0-9]{2}"
+                placeholder="dd mm yyyy"
+                required
+              />
+            </div>
+          </div>
+          <div class="field">
+            <div class="control">
+              <input
+                class="button is-link"
+                type="submit"
+                value="Eintrag erstellen"
+              />
+            </div>
+          </div>
+        </form>
+      </div>
+    </section>
+  </body>
+</html>

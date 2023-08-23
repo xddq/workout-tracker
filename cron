@@ -1,0 +1,11 @@
+# Edit this file to introduce tasks to be run by cron.
+#
+# This file is run as crontab on the machine where the gitlab runner deploys its
+# prod container to.
+# m h  dom mon dow   command
+# Creates a backup of the mounted volume once a day. TODO: probably create a
+# dump and just store the dump. Also look to also keep the e.g. last 30 dumps
+# instead of an infinite amount.
+37 23 * * * mkdir -p /root/workout-db-backup && docker container cp workout-tracker-postgres-1:/var/lib/postgresql/data /root/workout-db-backup/$(date -I)
+# cleans docker build cache once a week to not go out of storage to quick
+* * 1 * * docker builder prune --force

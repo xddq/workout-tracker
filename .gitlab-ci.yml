@@ -1,0 +1,67 @@
+# NOTE: this gitlab ci file works with host docker networks because the
+# gitlab runner has the docker.sock mounted inside. Thats also the reason we
+# dont need to use docker dind(docker in docker).
+# see docker socket binding:
+# https://docs.gitlab.com/ee/ci/docker/using_docker_build.html
+
+# stages in the order we are going through them
+stages:
+  - build
+  - deploy
+
+image: tmaier/docker-compose:20.10
+
+build:
+  stage: build
+
+  # determines the gitlab runner that will be run. specific to my gitlab
+  # instance.
+  tags:
+    - anything
+
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main" && $CI_PIPELINE_SOURCE != "schedule"
+
+  script:
+    - cp ./docker-compose-prod.yaml ./docker-compose.yaml
+    - echo "building containers.."
+    - docker-compose build --no-cache
+
+deploy-demo:
+  stage: deploy
+
+  # determines the gitlab runner that will be run. specific to my gitlab
+  # instance.
+  tags:
+    - anything
+
+  rules:
+    # Only running on schedules. This schedule is there to restore the initial
+    # sta state on a periodic basis in an automated fashion.
+    - if: $CI_COMMIT_BRANCH == "main" && $CI_PIPELINE_SOURCE == "schedule"
+
+  script:
+    - cp ./env.demo ./.env
+    - cp ./docker-compose-demo.yaml ./docker-compose.yaml
+    # Killing the containers kills all entries since we have no persistant
+    # storage in our docker-compose-demo file for the db.
+    - docker-compose down
+    - echo "Spinning up containers..."
+    - docker-compose up -d
+
+deploy:
+  stage: deploy
+
+  # determines the gitlab runner that will be run. specific to my gitlab
+  # instance.
+  tags:
+    - anything
+
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main" && $CI_PIPELINE_SOURCE != "schedule"
+
+  script:
+    - cp ./env.prod ./.env
+    - cp ./docker-compose-prod.yaml ./docker-compose.yaml
+    - echo "Spinning up containers..."
+    - docker-compose up -d
