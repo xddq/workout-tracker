@@ -83,17 +83,26 @@ mkApp conn =
     get "/workouts/:id/show" $ do
       unparsedId <- param "id"
       success <- param "success" `rescue` (\_ -> return False)
-      -- TODO: try to figure out how to use monadtransformer here to use
-      -- something like `runSomeTransformer $ do
-      --                   -- here when we get a 'Left' it should 'short
-      --                   -- circuit' and return the Left as result of the do
-      --                   -- block.
-      --                   Right parsedWorkoutId <- textToEitherInt
-      --                   -- here when we get a 'Left' it should 'short
-      --                   -- circuit' and return the Left as result of the do
-      --                   -- block.
-      --                   Right workout <- liftIO (getWorkoutById conn parsedWorkoutId)
-      --                   TODO: adapt once we return an either for getExercisesForWorkout
+      -- TODO: Try to figure out how to use monad transformer here. It feels
+      -- like it should be possible to use something like
+      -- ```
+      -- exercisesEither <- runSomeTransformer $ do
+      -- -- here when we get a 'Left' it should 'short
+      -- -- circuit' and return the Left as result of the do
+      -- -- block.
+      -- Right parsedWorkoutId <- textToEitherInt
+      -- -- here when we get a 'Left' it should 'short
+      -- -- circuit' and return the Left as result of the do
+      -- -- block.
+      -- Right workout <- liftIO (getWorkoutById conn parsedWorkoutId)
+      -- -- here when we get a 'Left' it should 'short
+      -- -- circuit' and return the Left as result of the do
+      -- -- block.
+      -- Right exercises <- liftIO (getExercisesForWorkout conn (workoutId workout))
+      -- return exercises
+      --
+      -- displayPage $ showWorkoutPage success workout exercisesEither
+      -- ```
       case textToEitherInt unparsedId of
         Left err -> displayPage $ errorPage err
         Right parsedWorkoutId -> do
