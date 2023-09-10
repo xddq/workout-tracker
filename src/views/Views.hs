@@ -331,15 +331,17 @@ editWorkoutPage x = docTypeHtml $ do
   makeHtmlHead $ mkTitle "Edit Workout"
   body $ editWorkoutSnippet x
 
-editExercisePage :: Exercise -> Html
-editExercisePage x = docTypeHtml $ do
+editExercisePage :: Either Text Exercise -> Html
+editExercisePage (Right exercise) = docTypeHtml $ do
   makeHtmlHead $ mkTitle "Edit Exercise"
-  body $ editExerciseSnippet x
+  body $ editExerciseSnippet exercise
+editExercisePage (Left err) = errorPage err
 
-deleteExercisePage :: Exercise -> Html
-deleteExercisePage x = docTypeHtml $ do
+deleteExercisePage :: Either Text Exercise -> Html
+deleteExercisePage (Right exercise) = docTypeHtml $ do
   makeHtmlHead $ mkTitle "Delete Exercise"
-  body $ deleteExerciseSnippet x
+  body $ deleteExerciseSnippet exercise
+deleteExercisePage (Left err) = errorPage err
 
 -- deleteWorkoutPage :: Workout -> Html
 -- deleteWorkoutPage x = docTypeHtml $ do

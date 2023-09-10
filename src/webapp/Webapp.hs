@@ -14,7 +14,7 @@ import qualified Data.Text.Lazy as T
 import Data.Text.Lazy.Encoding (decodeUtf8)
 import Data.Text.Lazy.Read (decimal)
 import Data.Time (Day, UTCTime (utctDay), defaultTimeLocale, formatTime, getCurrentTime, parseTimeM)
-import Database (CreateExerciseInput (CreateExerciseInput), CreateWorkoutInput (CreateWorkoutInput), Exercise (Exercise, exerciseWorkoutId), Workout (Workout, workoutId), createExercise, createWorkout, deleteExerciseById, deleteWorkoutWithExercises, getExerciseById, getExercisesForWorkout, getHighestPositionByWorkoutId, getWorkoutById, getWorkouts, updateExercise, updatePositionOfExercise, updatePositionsOfExercises, updateWorkout)
+import Database (CreateExerciseInput (CreateExerciseInput), CreateWorkoutInput (CreateWorkoutInput), Exercise (Exercise, exerciseWorkoutId), Workout (Workout, workoutId), createExercise, createWorkout, deleteExerciseById, deleteWorkoutWithExercises, getExerciseById, getExercisesForWorkout, getHighestPositionByWorkoutId, getWorkoutById, getWorkouts, maybeToRight, updateExercise, updatePositionOfExercise, updatePositionsOfExercises, updateWorkout)
 import Database.PostgreSQL.Simple (Connection)
 import Database.PostgreSQL.Simple.Types (PGArray (PGArray))
 import GHC.Generics (Generic)
@@ -115,10 +115,10 @@ mkApp conn =
 
     get "/workouts/:id/delete" $ do
       unparsedId <- param "id"
-      case decimal unparsedId of
-        Left err -> text $ htmlToText (errorPage $ pack err)
-        Right (parsedId, _rest) -> do
-          workoutEither <- liftIO (getWorkoutById conn parsedId)
+      case textToEitherInt unparsedId of
+        Left err -> displayPage $ errorPage err
+        Right parsedWorkoutId -> do
+          workoutEither <- liftIO (getWorkoutById conn parsedWorkoutId)
           displayPage $ deleteWorkoutPage workoutEither
 
     get "/workouts/:id/exercises/order" $ do
@@ -128,36 +128,33 @@ mkApp conn =
 
     get "/exercises/:id/delete" $ do
       unparsedId <- param "id"
-      case decimal unparsedId of
-        Left err -> text $ htmlToText (errorPage $ pack err)
-        Right (parsedId, _rest) -> do
-          exerciseList <- liftIO (getExerciseById conn parsedId)
-          case listToMaybe exerciseList of
-            Nothing -> displayPage $ errorPage "not found"
-            Just x -> displayPage $ deleteExercisePage x
+      case textToEitherInt unparsedId of
+        Left err -> text $ htmlToText (errorPage err)
+        Right parsedExerciseId -> do
+          exerciseEither <- liftIO (getExerciseById conn parsedExerciseId)
+          displayPage $ deleteExercisePage exerciseEither
 
     get "/exercises/:id/edit" $ do
       unparsedId <- param "id"
-      case decimal unparsedId of
-        Left err -> text $ htmlToText (errorPage $ pack err)
-        Right (parsedId, _rest) -> do
-          exerciseList <- liftIO (getExerciseById conn parsedId)
-          case listToMaybe exerciseList of
-            Just x -> displayPage $ editExercisePage x
-            Nothing -> displayPage $ errorPage "not found"
+      case textToEitherInt unparsedId of
+        Left err -> displayPage $ errorPage err
+        Right parsedExerciseId -> do
+          exerciseEither <- liftIO (getExerciseById conn parsedExerciseId)
+          displayPage $ deleteExercisePage exerciseEither
 
-    -- expecting the form params here in order to create the new entry
-    -- TODO: use the prefillWorkoutId to create workout with given exercises!
-    -- also use the type of the prefillWorkout for the new workout.
     post "/api/create-workout" $ do
-      workoutType <- param "type" :: ActionM Text
-      workoutId <- param "prefillWorkoutId" :: ActionM Int
+      workoutType <- param "type"
+      unparsedWorkoutId <- param "prefillWorkoutId"
       workoutDate <- param "date" :: ActionM String
+      -- TODO: continue here.
       case textToDate workoutDate of
         Nothing -> displayPage $ errorPage "could not parse the given date"
         Just date -> do
-          createdWorkout <- liftIO $ createWorkout conn (CreateWorkoutInput (if T.null workoutType then "Keine Angabe" else workoutType) date workoutId)
-          if isJust createdWorkout then redirect ("/" <> "?success=true") else displayPage $ errorPage "error creating workout"
+          case textToEitherInt unparsedWorkoutId of
+            Right parsedWorkoutId -> do
+              createdWorkout <- liftIO $ createWorkout conn (CreateWorkoutInput (if T.null workoutType then "Keine Angabe" else workoutType) date parsedWorkoutId)
+              if isJust createdWorkout then redirect ("/" <> "?success=true") else displayPage $ errorPage "error creating workout"
+            Left err -> displayPage $ errorPage err
 
     post "/api/create-exercise" $ do
       title <- param "title" :: ActionM Text
@@ -194,10 +191,10 @@ mkApp conn =
                 -- NOTE: could just pass the 'workoutId' via path or also post
                 -- param. For now just query for the workoutId of any given
                 -- exercise (all belong to the same exercise).
-                exerciseList <- liftIO $ getExerciseById conn $ snd $ head exercisePositionTuples
-                case listToMaybe exerciseList of
-                  Just exercise -> redirect ("/workouts/" <> pack (show $ exerciseWorkoutId exercise) <> "/show?success=true")
-                  Nothing -> displayPage $ errorPage "error getting the exercise for a given exerciseId"
+                exerciseEither <- liftIO $ getExerciseById conn $ snd $ head exercisePositionTuples
+                case exerciseEither of
+                  Right exercise -> redirect ("/workouts/" <> pack (show $ exerciseWorkoutId exercise) <> "/show?success=true")
+                  Left err -> displayPage $ errorPage err
               Nothing -> displayPage $ errorPage "error updating the exercises"
 
     post "/api/update-exercise" $ do

@@ -24,6 +24,7 @@ module Database
     updateExercise,
     repsToText,
     weightsToText,
+    maybeToRight,
   )
 where
 
@@ -109,6 +110,8 @@ createWorkout conn x = do
   where
     exerciseToCreateExerciseInput workoutId ex = CreateExerciseInput (exerciseTitle ex) (exerciseReps ex) (exerciseNote ex) (exercisePosition ex) workoutId (exerciseWeightsInKg ex)
 
+-- TODO: perhaps move this into a util package..? Or decide which other
+-- package to install and to import it from..?
 maybeToRight :: Text -> Maybe a -> Either Text a
 maybeToRight err Nothing = Left err
 maybeToRight _ (Just x) = Right x
@@ -144,8 +147,13 @@ unsafeGetExercisesForWorkout conn workoutId = do
 getExercisesForWorkout :: Connection -> Int -> IO (Either Text [Exercise])
 getExercisesForWorkout conn id = catchDbExceptions (unsafeGetExercisesForWorkout conn id)
 
-getExerciseById :: Connection -> Int -> IO [Exercise]
-getExerciseById conn x = query conn "SELECT * FROM exercises WHERE id = ?" (Only x)
+unsafeGetExerciseById :: Connection -> Int -> IO (Either Text Exercise)
+unsafeGetExerciseById conn id = do
+  exercise <- query conn "SELECT * FROM exercises WHERE id = ?" (Only id)
+  return $ maybeToRight "no exercise was found" $ listToMaybe exercise
+
+getExerciseById :: Connection -> Int -> IO (Either Text Exercise)
+getExerciseById conn id = catchDbExceptions (unsafeGetExerciseById conn id)
 
 -- TODO: start and stop transaction here
 {- Deletes the given exercises and updates the positions of all exercises that
