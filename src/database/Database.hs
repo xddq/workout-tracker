@@ -103,8 +103,8 @@ createWorkout conn x = do
       if createWorkoutInputPrefillWorkoutId x == -1
         then return (Just workout)
         else do
-          exercises <- getExercisesForWorkout conn (createWorkoutInputPrefillWorkoutId x)
-          mapM (createExercise conn) (map (exerciseToCreateExerciseInput $ workoutId workout) exercises)
+          Right exercises <- getExercisesForWorkout conn (createWorkoutInputPrefillWorkoutId x)
+          mapM_ (createExercise conn) (map (exerciseToCreateExerciseInput $ workoutId workout) exercises)
           return $ Just workout
   where
     exerciseToCreateExerciseInput workoutId ex = CreateExerciseInput (exerciseTitle ex) (exerciseReps ex) (exerciseNote ex) (exercisePosition ex) workoutId (exerciseWeightsInKg ex)
@@ -136,8 +136,13 @@ getWorkoutById conn id = catchDbExceptions (unsafeGetWorkoutById conn id)
 updateWorkout :: Connection -> Workout -> IO [Workout]
 updateWorkout conn (Workout workoutId workoutType workoutDate) = query conn "UPDATE workouts SET type=?, date=? WHERE id=? RETURNING *" (workoutType, workoutDate, workoutId)
 
-getExercisesForWorkout :: Connection -> Int -> IO [Exercise]
-getExercisesForWorkout conn workoutId = query conn "SELECT * FROM exercises WHERE workout_id = ? ORDER BY position ASC" (Only workoutId)
+unsafeGetExercisesForWorkout :: Connection -> Int -> IO (Either Text [Exercise])
+unsafeGetExercisesForWorkout conn workoutId = do
+  exercises <- query conn "SELECT * FROM exercises WHERE workout_id = ? ORDER BY position ASC" (Only workoutId)
+  return $ Right exercises
+
+getExercisesForWorkout :: Connection -> Int -> IO (Either Text [Exercise])
+getExercisesForWorkout conn id = catchDbExceptions (unsafeGetExercisesForWorkout conn id)
 
 getExerciseById :: Connection -> Int -> IO [Exercise]
 getExerciseById conn x = query conn "SELECT * FROM exercises WHERE id = ?" (Only x)
@@ -153,7 +158,7 @@ deleteExerciseById conn x = do
   case listToMaybe deletedExercises of
     Nothing -> return Nothing
     Just deletedExercise -> do
-      exercises <- getExercisesForWorkout conn $ exerciseWorkoutId x
+      Right exercises <- getExercisesForWorkout conn $ exerciseWorkoutId x
       updatedExercises <- mapM (updateExercise conn) (updatePriority $ sortExercises exercises)
       return $ Just deletedExercise
   where

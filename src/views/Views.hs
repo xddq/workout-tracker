@@ -305,22 +305,24 @@ landingPage _ _ (Left err) = errorPage err
 -- has a value we display the successsnippet with a message
 type Success = Bool
 
-showWorkoutPage :: Success -> Workout -> [Exercise] -> Html
-showWorkoutPage s x ys = docTypeHtml $ do
+showWorkoutPage :: Success -> Workout -> Either Text [Exercise] -> Html
+showWorkoutPage s workout (Right exercises) = docTypeHtml $ do
   makeHtmlHead $ mkTitle "Show Workout"
   body $ do
     successSnippet s
-    showWorkoutSnippet x
-    displayExerciseListSnippet ys
+    showWorkoutSnippet workout
+    displayExerciseListSnippet exercises
     backToHomePageSnippet
-    addExerciseSnippet x
+    addExerciseSnippet workout
+showWorkoutPage _ _ (Left err) = errorPage err
 
-showOrderExercisesPage :: [Exercise] -> Html
-showOrderExercisesPage xs = docTypeHtml $ do
+showOrderExercisesPage :: Either Text [Exercise] -> Html
+showOrderExercisesPage (Right xs) = docTypeHtml $ do
   makeHtmlHead $ mkTitle "Order Exercises"
   body $ do
     backToHomePageSnippet
     displayOrderExerciseListSnippet xs
+showOrderExercisesPage (Left err) = errorPage err
 
 -- TODO: Just an idea for now. Maybe we could create generic/polymorphic edit
 -- and delete pages later (after done with the app).

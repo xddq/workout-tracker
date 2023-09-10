@@ -101,9 +101,8 @@ mkApp conn =
           case workoutEither of
             Left err -> displayPage $ errorPage err
             Right workout -> do
-              -- TODO: return an Either here
-              exercises <- liftIO (getExercisesForWorkout conn (workoutId workout))
-              displayPage $ showWorkoutPage success workout exercises
+              exercisesEither <- liftIO (getExercisesForWorkout conn (workoutId workout))
+              displayPage $ showWorkoutPage success workout exercisesEither
 
     get "/workouts/:id/delete" $ do
       unparsedId <- param "id"
@@ -115,8 +114,8 @@ mkApp conn =
 
     get "/workouts/:id/exercises/order" $ do
       workoutId <- param "id" :: ActionM Int
-      exercises <- liftIO (getExercisesForWorkout conn workoutId)
-      displayPage $ showOrderExercisesPage exercises
+      exercisesEither <- liftIO (getExercisesForWorkout conn workoutId)
+      displayPage $ showOrderExercisesPage exercisesEither
 
     get "/exercises/:id/delete" $ do
       unparsedId <- param "id"
