@@ -2,7 +2,7 @@
 
 module Webapp (mkApp) where
 
-import Control.Monad.Cont (MonadIO (liftIO))
+import Control.Monad.IO.Class (MonadIO (liftIO))
 import Data.Aeson (FromJSON (parseJSON), Result (Error, Success), ToJSON (toJSON), Value, decode, encode, fromJSON, object, withObject, (.:), (.=))
 import Data.Either (fromLeft, isLeft)
 import Data.List (sortOn)
@@ -66,9 +66,9 @@ mkApp conn =
         Left err -> text $ htmlToText (errorPage $ pack err)
         Right (parsedId, _rest) -> do
           workoutList <- liftIO (getWorkoutById conn parsedId)
-          case listToMaybe workoutList of
-            Just x -> displayPage $ editWorkoutPage x
-            Nothing -> displayPage $ errorPage "not found"
+          case workoutList of
+            Right x -> displayPage $ editWorkoutPage x
+            Left x -> displayPage $ errorPage "not found"
 
     -- display exercises of the workout (also able to edit them)
     get "/workouts/:id/show" $ do
@@ -78,11 +78,11 @@ mkApp conn =
         Left err -> text $ htmlToText (errorPage $ pack err)
         Right (parsedId, _rest) -> do
           workoutList <- liftIO (getWorkoutById conn parsedId)
-          case listToMaybe workoutList of
-            Just workout -> do
+          case workoutList of
+            Right workout -> do
               exercises <- liftIO (getExercisesForWorkout conn (workoutId workout))
               displayPage $ showWorkoutPage success workout exercises
-            Nothing -> displayPage $ errorPage "not found"
+            Left err -> displayPage $ errorPage err
 
     get "/workouts/:id/delete" $ do
       unparsedId <- param "id"
@@ -90,9 +90,9 @@ mkApp conn =
         Left err -> text $ htmlToText (errorPage $ pack err)
         Right (parsedId, _rest) -> do
           workouts <- liftIO (getWorkoutById conn parsedId)
-          case listToMaybe workouts of
-            Nothing -> displayPage $ errorPage "not found"
-            Just workout -> displayPage $ deleteWorkoutPage workout
+          case workouts of
+            Left err -> displayPage $ errorPage err
+            Right workout -> displayPage $ deleteWorkoutPage workout
 
     get "/workouts/:id/exercises/order" $ do
       workoutId <- param "id" :: ActionM Int

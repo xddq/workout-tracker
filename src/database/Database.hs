@@ -112,8 +112,15 @@ createWorkout conn x = do
 getWorkouts :: Connection -> IO [Workout]
 getWorkouts conn = query_ conn "SELECT * FROM workouts ORDER BY date DESC"
 
-getWorkoutById :: Connection -> Int -> IO [Workout]
-getWorkoutById conn x = query conn "SELECT * FROM workouts WHERE id = ?" (Only x)
+unsafeGetWorkoutById :: Connection -> Int -> IO (Either Text Workout)
+unsafeGetWorkoutById conn x = do
+  workout <- query conn "SELECT * FROM workouts WHERE id = ?" (Only x) :: IO [Workout]
+  case listToMaybe workout of
+    Nothing -> return $ Left "No workout found for given id"
+    Just x -> return $ Right x
+
+getWorkoutById :: Connection -> Int -> IO (Either Text Workout)
+getWorkoutById conn id = catchDbExceptions (unsafeGetWorkoutById conn id)
 
 updateWorkout :: Connection -> Workout -> IO [Workout]
 updateWorkout conn (Workout workoutId workoutType workoutDate) = query conn "UPDATE workouts SET type=?, date=? WHERE id=? RETURNING *" (workoutType, workoutDate, workoutId)
@@ -197,10 +204,10 @@ unsafeCreateExercise conn (CreateExerciseInput title reps note position workoutI
   result <- query conn "INSERT INTO exercises (title, reps, note, position, workout_id, weight_in_kg) VALUES (?,?,?,?,?,?) RETURNING *" (title, reps, note, position, workoutId, weights)
   case listToMaybe result of
     Just exercise -> do
-      putStrLn $ show exercise
+      print exercise
       return $ Right exercise
     Nothing -> do
-      putStrLn $ show "error"
+      print "error"
       return $ Left "Error creating the exercise. The 'returning *' gave us an empty list."
 
 -- trying out catching exceptions and using either type under the hood.
