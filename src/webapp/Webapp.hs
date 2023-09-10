@@ -44,6 +44,13 @@ displayPage x = do
   setHeader "Content-Type" "text/html; charset=utf-8"
   text $ htmlToText x
 
+-- Creates the resulting html we are going to serve based on a calculation that
+-- could have failed. The first function of the tuple will be run on success and
+-- the second one on failure. Recommended way to serve html in this app.
+createHtml :: Either Text a -> (a -> Html, Text -> Html) -> Html
+createHtml (Left err) (_, g) = g err
+createHtml (Right a) (f, _) = f a
+
 mkApp :: Connection -> IO Application
 mkApp conn =
   scottyApp $ do
@@ -53,36 +60,29 @@ mkApp conn =
     -- serve static files from the "static" directory
     middleware $ staticPolicy (addBase "static")
 
-    -- ability to create workout and display previous ones
     get "/" $ do
       success <- param "success" `rescue` (\_ -> return False)
       currentDate <- liftIO (utctDay <$> getCurrentTime)
-      workouts <- liftIO (getWorkouts conn)
-      displayPage $ landingPage success (mkCurrentDate currentDate) workouts
+      workoutsEither <- liftIO (getWorkouts conn)
+      displayPage $ landingPage success (mkCurrentDate currentDate) workoutsEither
 
-    -- edit workout (just type and date)
-    -- TODO: try to use monad transformer here
     get "/workouts/:id/edit" $ do
       unparsedId <- param "id"
-      result <- runExceptT $ do
-        ExceptT $ decimal unparsedId
       case decimal unparsedId of
-        Left err -> text $ htmlToText (errorPage $ pack err)
+        Left err -> displayPage $ errorPage $ pack err
         Right (parsedId, _rest) -> do
-          workoutList <- liftIO (getWorkoutById conn parsedId)
-          case workoutList of
-            Right x -> displayPage $ editWorkoutPage x
-            Left x -> displayPage $ errorPage "not found"
+          workoutEither <- liftIO (getWorkoutById conn parsedId)
+          displayPage $ createHtml workoutEither (editWorkoutPage, errorPage)
 
     -- display exercises of the workout (also able to edit them)
     get "/workouts/:id/show" $ do
       unparsedId <- param "id"
       success <- param "success" `rescue` (\_ -> return False)
       case decimal unparsedId of
-        Left err -> text $ htmlToText (errorPage $ pack err)
+        Left err -> displayPage $ errorPage $ pack err
         Right (parsedId, _rest) -> do
-          workoutList <- liftIO (getWorkoutById conn parsedId)
-          case workoutList of
+          workoutEither <- liftIO (getWorkoutById conn parsedId)
+          case workoutEither of
             Right workout -> do
               exercises <- liftIO (getExercisesForWorkout conn (workoutId workout))
               displayPage $ showWorkoutPage success workout exercises
@@ -93,10 +93,8 @@ mkApp conn =
       case decimal unparsedId of
         Left err -> text $ htmlToText (errorPage $ pack err)
         Right (parsedId, _rest) -> do
-          workouts <- liftIO (getWorkoutById conn parsedId)
-          case workouts of
-            Left err -> displayPage $ errorPage err
-            Right workout -> displayPage $ deleteWorkoutPage workout
+          workoutEither <- liftIO (getWorkoutById conn parsedId)
+          displayPage $ deleteWorkoutPage workoutEither
 
     get "/workouts/:id/exercises/order" $ do
       workoutId <- param "id" :: ActionM Int

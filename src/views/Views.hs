@@ -292,14 +292,17 @@ backToHomePageSnippet = section ! class_ "section" $ H.div ! class_ "container" 
 -- __snippets__
 
 -- pages
-landingPage :: Success -> CurrentDate -> [Workout] -> Html
-landingPage s x y = docTypeHtml $ do
+landingPage :: Success -> CurrentDate -> Either Text [Workout] -> Html
+landingPage s date (Right workouts) = docTypeHtml $ do
   makeHtmlHead $ mkTitle "Workout Tracker"
   body $ do
     successSnippet s
-    addWorkoutSnippet x y
-    displayWorkoutListSnippet x y
+    addWorkoutSnippet date workouts
+    displayWorkoutListSnippet date workouts
+landingPage _ _ (Left err) = errorPage err
 
+-- TODO: Perhaps use/try 'Maybe a' newtype wrapper with semantics of -> if it
+-- has a value we display the successsnippet with a message
 type Success = Bool
 
 showWorkoutPage :: Success -> Workout -> [Exercise] -> Html
@@ -336,10 +339,16 @@ deleteExercisePage x = docTypeHtml $ do
   makeHtmlHead $ mkTitle "Delete Exercise"
   body $ deleteExerciseSnippet x
 
-deleteWorkoutPage :: Workout -> Html
-deleteWorkoutPage x = docTypeHtml $ do
+-- deleteWorkoutPage :: Workout -> Html
+-- deleteWorkoutPage x = docTypeHtml $ do
+--   makeHtmlHead $ mkTitle "Delete Workout"
+--   body $ deleteWorkoutSnippet x
+
+deleteWorkoutPage :: Either Text Workout -> Html
+deleteWorkoutPage (Right workout) = docTypeHtml $ do
   makeHtmlHead $ mkTitle "Delete Workout"
-  body $ deleteWorkoutSnippet x
+  body $ deleteWorkoutSnippet workout
+deleteWorkoutPage (Left err) = errorPage err
 
 successPage :: Html
 successPage = docTypeHtml $ do

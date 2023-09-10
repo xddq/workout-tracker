@@ -109,8 +109,19 @@ createWorkout conn x = do
   where
     exerciseToCreateExerciseInput workoutId ex = CreateExerciseInput (exerciseTitle ex) (exerciseReps ex) (exerciseNote ex) (exercisePosition ex) workoutId (exerciseWeightsInKg ex)
 
-getWorkouts :: Connection -> IO [Workout]
-getWorkouts conn = query_ conn "SELECT * FROM workouts ORDER BY date DESC"
+maybeToRight :: Text -> Maybe a -> Either Text a
+maybeToRight err Nothing = Left err
+maybeToRight _ (Just x) = Right x
+
+-- using Either Text [Workout] here to be able to use the catchDbExceptions
+-- function similar to the other functions
+unsafeGetWorkouts :: Connection -> IO (Either Text [Workout])
+unsafeGetWorkouts conn = do
+  workouts <- query_ conn "SELECT * FROM workouts ORDER BY date DESC" :: IO [Workout]
+  return $ Right workouts
+
+getWorkouts :: Connection -> IO (Either Text [Workout])
+getWorkouts conn = catchDbExceptions (unsafeGetWorkouts conn)
 
 unsafeGetWorkoutById :: Connection -> Int -> IO (Either Text Workout)
 unsafeGetWorkoutById conn x = do
