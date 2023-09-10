@@ -51,6 +51,12 @@ createHtml :: Either Text a -> (a -> Html, Text -> Html) -> Html
 createHtml (Left err) (_, g) = g err
 createHtml (Right a) (f, _) = f a
 
+textToEitherInt :: T.Text -> Either T.Text Int
+textToEitherInt txt =
+  case decimal txt of
+    Right (i, rest) -> if T.null rest then Right i else Left $ "Extra characters after integer: " <> rest
+    _ -> Left $ "Could not parse: " <> txt
+
 mkApp :: Connection -> IO Application
 mkApp conn =
   scottyApp $ do
@@ -68,25 +74,36 @@ mkApp conn =
 
     get "/workouts/:id/edit" $ do
       unparsedId <- param "id"
-      case decimal unparsedId of
-        Left err -> displayPage $ errorPage $ pack err
-        Right (parsedId, _rest) -> do
-          workoutEither <- liftIO (getWorkoutById conn parsedId)
+      case textToEitherInt unparsedId of
+        Left err -> displayPage $ errorPage err
+        Right id -> do
+          workoutEither <- liftIO (getWorkoutById conn id)
           displayPage $ createHtml workoutEither (editWorkoutPage, errorPage)
 
-    -- display exercises of the workout (also able to edit them)
     get "/workouts/:id/show" $ do
       unparsedId <- param "id"
       success <- param "success" `rescue` (\_ -> return False)
-      case decimal unparsedId of
-        Left err -> displayPage $ errorPage $ pack err
-        Right (parsedId, _rest) -> do
-          workoutEither <- liftIO (getWorkoutById conn parsedId)
+      -- TODO: try to figure out how to use monadtransformer here to use
+      -- something like `runSomeTransformer $ do
+      --                   -- here when we get a 'Left' it should 'short
+      --                   -- circuit' and return the Left as result of the do
+      --                   -- block.
+      --                   Right parsedWorkoutId <- textToEitherInt
+      --                   -- here when we get a 'Left' it should 'short
+      --                   -- circuit' and return the Left as result of the do
+      --                   -- block.
+      --                   Right workout <- liftIO (getWorkoutById conn parsedWorkoutId)
+      --                   TODO: adapt once we return an either for getExercisesForWorkout
+      case textToEitherInt unparsedId of
+        Left err -> displayPage $ errorPage err
+        Right parsedWorkoutId -> do
+          workoutEither <- liftIO (getWorkoutById conn parsedWorkoutId)
           case workoutEither of
+            Left err -> displayPage $ errorPage err
             Right workout -> do
+              -- TODO: return an Either here
               exercises <- liftIO (getExercisesForWorkout conn (workoutId workout))
               displayPage $ showWorkoutPage success workout exercises
-            Left err -> displayPage $ errorPage err
 
     get "/workouts/:id/delete" $ do
       unparsedId <- param "id"
