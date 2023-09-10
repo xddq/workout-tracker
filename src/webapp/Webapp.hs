@@ -2,6 +2,7 @@
 
 module Webapp (mkApp) where
 
+import Control.Monad.Except (ExceptT (ExceptT), runExceptT)
 import Control.Monad.IO.Class (MonadIO (liftIO))
 import Data.Aeson (FromJSON (parseJSON), Result (Error, Success), ToJSON (toJSON), Value, decode, encode, fromJSON, object, withObject, (.:), (.=))
 import Data.Either (fromLeft, isLeft)
@@ -60,8 +61,11 @@ mkApp conn =
       displayPage $ landingPage success (mkCurrentDate currentDate) workouts
 
     -- edit workout (just type and date)
+    -- TODO: try to use monad transformer here
     get "/workouts/:id/edit" $ do
       unparsedId <- param "id"
+      result <- runExceptT $ do
+        ExceptT $ decimal unparsedId
       case decimal unparsedId of
         Left err -> text $ htmlToText (errorPage $ pack err)
         Right (parsedId, _rest) -> do
