@@ -2,8 +2,9 @@
 
 module Webapp (mkApp) where
 
-import Control.Monad.Except (ExceptT (ExceptT), runExceptT)
+import Control.Monad.Except (ExceptT (ExceptT), liftEither, runExceptT)
 import Control.Monad.IO.Class (MonadIO (liftIO))
+import Control.Monad.Identity (IdentityT (IdentityT, runIdentityT))
 import Data.Aeson (FromJSON (parseJSON), Result (Error, Success), ToJSON (toJSON), Value, decode, encode, fromJSON, object, withObject, (.:), (.=))
 import Data.Either (fromLeft, isLeft)
 import Data.List (sortOn)
@@ -56,6 +57,12 @@ textToEitherInt txt =
   case decimal txt of
     Right (i, rest) -> if T.null rest then Right i else Left $ "Extra characters after integer: " <> rest
     _ -> Left $ "Could not parse: " <> txt
+
+textToEitherInt2 :: T.Text -> IdentityT (Either Text) Int
+textToEitherInt2 txt =
+  case decimal txt of
+    Right (i, rest) -> if T.null rest then IdentityT $ Right i else IdentityT $ Left $ "Extra characters after integer: " <> rest
+    _ -> IdentityT $ Left $ "Could not parse: " <> txt
 
 mkApp :: Connection -> IO Application
 mkApp conn =
@@ -146,7 +153,6 @@ mkApp conn =
       workoutType <- param "type"
       unparsedWorkoutId <- param "prefillWorkoutId"
       workoutDate <- param "date" :: ActionM String
-      -- TODO: continue here.
       case textToDate workoutDate of
         Nothing -> displayPage $ errorPage "could not parse the given date"
         Just date -> do
@@ -157,26 +163,33 @@ mkApp conn =
             Left err -> displayPage $ errorPage err
 
     post "/api/create-exercise" $ do
-      title <- param "title" :: ActionM Text
-      unparsedReps <- param "reps" :: ActionM Text
-      note <- param "note" :: ActionM Text
-      unparsedWeights <- param "weightsInKg" :: ActionM Text
-      workoutId <- param "workoutId" :: ActionM Int
+      title <- param "title"
+      unparsedReps <- param "reps"
+      note <- param "note"
+      unparsedWeights <- param "weightsInKg"
+      unparsedWorkoutId <- param "workoutId"
+      -- TODO: maybe create "parseCreateExerciseParams" which returns either
+      -- with parser errors (reps, weightsInKg, workoutId)
+      -- TODO: Can we use monad transformers here to pattern match on Right (or
+      -- Just) and on no match return the error..?! If so, how?
       case parseReps unparsedReps of
+        Nothing -> displayPage $ errorPage "error parsing the reps"
         Just reps -> do
           case parseWeights unparsedWeights of
             Nothing -> displayPage $ errorPage "error parsing the weights"
             Just weights -> do
-              position <- liftIO $ getHighestPositionByWorkoutId conn workoutId
-              case position of
+              case textToEitherInt unparsedWorkoutId of
                 Left err -> displayPage $ errorPage err
-                Right position -> do
-                  createdExercise <- liftIO $ createExercise conn (CreateExerciseInput title (PGArray reps) note position workoutId (PGArray weights))
-                  either
-                    (displayPage . errorPage)
-                    (\x -> redirect ("/workouts/" <> pack (show $ exerciseWorkoutId x) <> "/show?success=true"))
-                    createdExercise
-        Nothing -> displayPage $ errorPage "error parsing the reps"
+                Right parsedWorkoutId -> do
+                  position <- liftIO $ getHighestPositionByWorkoutId conn parsedWorkoutId
+                  case position of
+                    Left err -> displayPage $ errorPage err
+                    Right position -> do
+                      createdExercise <- liftIO $ createExercise conn (CreateExerciseInput title (PGArray reps) note position parsedWorkoutId (PGArray weights))
+                      either
+                        (displayPage . errorPage)
+                        (\x -> redirect ("/workouts/" <> pack (show $ exerciseWorkoutId x) <> "/show?success=true"))
+                        createdExercise
 
     -- bulk updates exercises, used for updating their position/order
     post "/api/update-exercises" $ do
