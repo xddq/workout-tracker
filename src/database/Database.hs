@@ -24,6 +24,7 @@ module Database
     updateExercise,
     repsToText,
     weightsToText,
+    maybeToRight,
   )
 where
 
@@ -103,26 +104,56 @@ createWorkout conn x = do
       if createWorkoutInputPrefillWorkoutId x == -1
         then return (Just workout)
         else do
-          exercises <- getExercisesForWorkout conn (createWorkoutInputPrefillWorkoutId x)
-          mapM (createExercise conn) (map (exerciseToCreateExerciseInput $ workoutId workout) exercises)
+          Right exercises <- getExercisesForWorkout conn (createWorkoutInputPrefillWorkoutId x)
+          mapM_ (createExercise conn) (map (exerciseToCreateExerciseInput $ workoutId workout) exercises)
           return $ Just workout
   where
     exerciseToCreateExerciseInput workoutId ex = CreateExerciseInput (exerciseTitle ex) (exerciseReps ex) (exerciseNote ex) (exercisePosition ex) workoutId (exerciseWeightsInKg ex)
 
-getWorkouts :: Connection -> IO [Workout]
-getWorkouts conn = query_ conn "SELECT * FROM workouts ORDER BY date DESC"
+-- TODO: perhaps move this into a util package..? Or decide which other
+-- package to install and to import it from..?
+maybeToRight :: Text -> Maybe a -> Either Text a
+maybeToRight err Nothing = Left err
+maybeToRight _ (Just x) = Right x
 
-getWorkoutById :: Connection -> Int -> IO [Workout]
-getWorkoutById conn x = query conn "SELECT * FROM workouts WHERE id = ?" (Only x)
+-- using Either Text [Workout] here to be able to use the catchDbExceptions
+-- function similar to the other functions
+unsafeGetWorkouts :: Connection -> IO (Either Text [Workout])
+unsafeGetWorkouts conn = do
+  workouts <- query_ conn "SELECT * FROM workouts ORDER BY date DESC" :: IO [Workout]
+  return $ Right workouts
+
+getWorkouts :: Connection -> IO (Either Text [Workout])
+getWorkouts conn = catchDbExceptions (unsafeGetWorkouts conn)
+
+unsafeGetWorkoutById :: Connection -> Int -> IO (Either Text Workout)
+unsafeGetWorkoutById conn x = do
+  workout <- query conn "SELECT * FROM workouts WHERE id = ?" (Only x) :: IO [Workout]
+  case listToMaybe workout of
+    Nothing -> return $ Left "No workout found for given id"
+    Just x -> return $ Right x
+
+getWorkoutById :: Connection -> Int -> IO (Either Text Workout)
+getWorkoutById conn id = catchDbExceptions (unsafeGetWorkoutById conn id)
 
 updateWorkout :: Connection -> Workout -> IO [Workout]
 updateWorkout conn (Workout workoutId workoutType workoutDate) = query conn "UPDATE workouts SET type=?, date=? WHERE id=? RETURNING *" (workoutType, workoutDate, workoutId)
 
-getExercisesForWorkout :: Connection -> Int -> IO [Exercise]
-getExercisesForWorkout conn workoutId = query conn "SELECT * FROM exercises WHERE workout_id = ? ORDER BY position ASC" (Only workoutId)
+unsafeGetExercisesForWorkout :: Connection -> Int -> IO (Either Text [Exercise])
+unsafeGetExercisesForWorkout conn workoutId = do
+  exercises <- query conn "SELECT * FROM exercises WHERE workout_id = ? ORDER BY position ASC" (Only workoutId)
+  return $ Right exercises
 
-getExerciseById :: Connection -> Int -> IO [Exercise]
-getExerciseById conn x = query conn "SELECT * FROM exercises WHERE id = ?" (Only x)
+getExercisesForWorkout :: Connection -> Int -> IO (Either Text [Exercise])
+getExercisesForWorkout conn id = catchDbExceptions (unsafeGetExercisesForWorkout conn id)
+
+unsafeGetExerciseById :: Connection -> Int -> IO (Either Text Exercise)
+unsafeGetExerciseById conn id = do
+  exercise <- query conn "SELECT * FROM exercises WHERE id = ?" (Only id)
+  return $ maybeToRight "no exercise was found" $ listToMaybe exercise
+
+getExerciseById :: Connection -> Int -> IO (Either Text Exercise)
+getExerciseById conn id = catchDbExceptions (unsafeGetExerciseById conn id)
 
 -- TODO: start and stop transaction here
 {- Deletes the given exercises and updates the positions of all exercises that
@@ -135,7 +166,7 @@ deleteExerciseById conn x = do
   case listToMaybe deletedExercises of
     Nothing -> return Nothing
     Just deletedExercise -> do
-      exercises <- getExercisesForWorkout conn $ exerciseWorkoutId x
+      Right exercises <- getExercisesForWorkout conn $ exerciseWorkoutId x
       updatedExercises <- mapM (updateExercise conn) (updatePriority $ sortExercises exercises)
       return $ Just deletedExercise
   where
@@ -197,10 +228,10 @@ unsafeCreateExercise conn (CreateExerciseInput title reps note position workoutI
   result <- query conn "INSERT INTO exercises (title, reps, note, position, workout_id, weight_in_kg) VALUES (?,?,?,?,?,?) RETURNING *" (title, reps, note, position, workoutId, weights)
   case listToMaybe result of
     Just exercise -> do
-      putStrLn $ show exercise
+      print exercise
       return $ Right exercise
     Nothing -> do
-      putStrLn $ show "error"
+      print "error"
       return $ Left "Error creating the exercise. The 'returning *' gave us an empty list."
 
 -- trying out catching exceptions and using either type under the hood.

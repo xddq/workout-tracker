@@ -292,54 +292,68 @@ backToHomePageSnippet = section ! class_ "section" $ H.div ! class_ "container" 
 -- __snippets__
 
 -- pages
-landingPage :: Success -> CurrentDate -> [Workout] -> Html
-landingPage s x y = docTypeHtml $ do
+landingPage :: Success -> CurrentDate -> Either Text [Workout] -> Html
+landingPage s date (Right workouts) = docTypeHtml $ do
   makeHtmlHead $ mkTitle "Workout Tracker"
   body $ do
     successSnippet s
-    addWorkoutSnippet x y
-    displayWorkoutListSnippet x y
+    addWorkoutSnippet date workouts
+    displayWorkoutListSnippet date workouts
+landingPage _ _ (Left err) = errorPage err
 
+-- TODO: Perhaps use/try 'Maybe a' newtype wrapper with semantics of -> if it
+-- has a value we display the successsnippet with a message
 type Success = Bool
 
-showWorkoutPage :: Success -> Workout -> [Exercise] -> Html
-showWorkoutPage s x ys = docTypeHtml $ do
+showWorkoutPage :: Success -> Workout -> Either Text [Exercise] -> Html
+showWorkoutPage s workout (Right exercises) = docTypeHtml $ do
   makeHtmlHead $ mkTitle "Show Workout"
   body $ do
     successSnippet s
-    showWorkoutSnippet x
-    displayExerciseListSnippet ys
+    showWorkoutSnippet workout
+    displayExerciseListSnippet exercises
     backToHomePageSnippet
-    addExerciseSnippet x
+    addExerciseSnippet workout
+showWorkoutPage _ _ (Left err) = errorPage err
 
-showOrderExercisesPage :: [Exercise] -> Html
-showOrderExercisesPage xs = docTypeHtml $ do
+showOrderExercisesPage :: Either Text [Exercise] -> Html
+showOrderExercisesPage (Right xs) = docTypeHtml $ do
   makeHtmlHead $ mkTitle "Order Exercises"
   body $ do
     backToHomePageSnippet
     displayOrderExerciseListSnippet xs
+showOrderExercisesPage (Left err) = errorPage err
 
 -- TODO: Just an idea for now. Maybe we could create generic/polymorphic edit
 -- and delete pages later (after done with the app).
-editWorkoutPage :: Workout -> Html
-editWorkoutPage x = docTypeHtml $ do
+editWorkoutPage :: Either Text Workout -> Html
+editWorkoutPage (Right workout) = docTypeHtml $ do
   makeHtmlHead $ mkTitle "Edit Workout"
-  body $ editWorkoutSnippet x
+  body $ editWorkoutSnippet workout
+editWorkoutPage (Left err) = errorPage err
 
-editExercisePage :: Exercise -> Html
-editExercisePage x = docTypeHtml $ do
+editExercisePage :: Either Text Exercise -> Html
+editExercisePage (Right exercise) = docTypeHtml $ do
   makeHtmlHead $ mkTitle "Edit Exercise"
-  body $ editExerciseSnippet x
+  body $ editExerciseSnippet exercise
+editExercisePage (Left err) = errorPage err
 
-deleteExercisePage :: Exercise -> Html
-deleteExercisePage x = docTypeHtml $ do
+deleteExercisePage :: Either Text Exercise -> Html
+deleteExercisePage (Right exercise) = docTypeHtml $ do
   makeHtmlHead $ mkTitle "Delete Exercise"
-  body $ deleteExerciseSnippet x
+  body $ deleteExerciseSnippet exercise
+deleteExercisePage (Left err) = errorPage err
 
-deleteWorkoutPage :: Workout -> Html
-deleteWorkoutPage x = docTypeHtml $ do
+-- deleteWorkoutPage :: Workout -> Html
+-- deleteWorkoutPage x = docTypeHtml $ do
+--   makeHtmlHead $ mkTitle "Delete Workout"
+--   body $ deleteWorkoutSnippet x
+
+deleteWorkoutPage :: Either Text Workout -> Html
+deleteWorkoutPage (Right workout) = docTypeHtml $ do
   makeHtmlHead $ mkTitle "Delete Workout"
-  body $ deleteWorkoutSnippet x
+  body $ deleteWorkoutSnippet workout
+deleteWorkoutPage (Left err) = errorPage err
 
 successPage :: Html
 successPage = docTypeHtml $ do
