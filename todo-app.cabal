@@ -23,7 +23,8 @@ library webapp
                        aeson == 2.1.2.1,
                        aeson-qq == 0.8.4,
                        bytestring == 0.11.4.0,
-                       mtl == 2.2.2,
+                       -- for monad transformers
+                       mtl == 2.3.1,
                        -- our database
                        database,
                        -- our views
@@ -41,6 +42,8 @@ library database
                        text == 1.2.5.0,
                        time == 1.12.2,
                        bytestring == 0.11.4.0,
+                       -- for monad transformers
+                       mtl == 2.3.1
 
 library views
   exposed-modules:     Views
