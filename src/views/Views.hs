@@ -141,6 +141,9 @@ addWorkoutSnippet currentDate xs = docTypeHtml $ do
         H.div ! class_ "control" $ H.div ! class_ "select" $ select ! name "prefillWorkoutId" $ do
           option ! value "-1" $ "Nicht basierend auf vorherigem Workout"
           workoutOptionsListSnippet xs
+      H.div ! class_ "field" $ do
+        H.label ! class_ "label" $ "Notiz zum Workout z.b Sehr fit heute, aktuell in der Diät, ausnahmsweise abends, etc.."
+        H.div ! class_ "control" $ input ! class_ "input" ! type_ "text" ! name "note" ! required "" ! value (toValue $ pack " ")
       H.div ! class_ "field" $ H.div ! class_ "control" $ input ! class_ "button is-link" ! type_ "submit" ! value "Eintrag erstellen"
 
 workoutOptionsListSnippet :: [Workout] -> Html
@@ -161,7 +164,7 @@ editWorkoutSnippet (Workout wId wType wDate wNote) = do
         H.label ! class_ "label" $ "Art des Workouts z.b. Ganzkörper, Pull, Beine, etc. (Feld leer lassen, wenn die Art eines vorherigen\n              Workouts übernommen werden soll)"
         H.div ! class_ "control" $ input ! class_ "input" ! type_ "text" ! name "type" ! value (toValue wType)
       H.div ! class_ "field" $ do
-        H.label ! class_ "label" $ "Notiz zum Workout z.b. Gestern schlecht geschlafen, Erstaunlich fit heute, Aktuell in der Diät, etc.."
+        H.label ! class_ "label" $ "Notiz zum Workout z.b Sehr fit heute, aktuell in der Diät, ausnahmsweise abends, etc.."
         H.div ! class_ "control" $ input ! class_ "input" ! type_ "text" ! name "note" ! value (toValue wNote)
       H.div ! class_ "field" $ H.div ! class_ "control" $ input ! class_ "button is-link" ! type_ "submit" ! value "Eintrag bearbeiten"
 

@@ -88,7 +88,8 @@ data Workout = Workout
 data CreateWorkoutInput = CreateWorkoutInput
   { createWorkoutInputType :: Text,
     createWorkoutInputDate :: Day,
-    createWorkoutInputPrefillWorkoutId :: Int
+    createWorkoutInputPrefillWorkoutId :: Int,
+    createWorkoutInputNote :: Text
   }
   deriving (Show, Generic, FromRow, ToRow)
 
@@ -98,7 +99,7 @@ data CreateWorkoutInput = CreateWorkoutInput
 -- and concept (which was my goal).
 createWorkout :: Connection -> CreateWorkoutInput -> IO (Maybe Workout)
 createWorkout conn x = do
-  createdWorkout <- query conn "INSERT INTO workouts (type, date) VALUES (?,?) RETURNING *" (createWorkoutInputType x, createWorkoutInputDate x) :: IO [Workout]
+  createdWorkout <- query conn "INSERT INTO workouts (type, date, note) VALUES (?,?,?) RETURNING *" (createWorkoutInputType x, createWorkoutInputDate x, createWorkoutInputNote x) :: IO [Workout]
   case listToMaybe createdWorkout of
     Nothing -> return Nothing
     Just workout -> do

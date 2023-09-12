@@ -132,10 +132,11 @@ mkApp conn =
       workoutType <- param "type"
       unparsedWorkoutId <- param "prefillWorkoutId"
       unparsedWorkoutDate <- param "date"
+      workoutNote <- param "note"
       case parseInput unparsedWorkoutId unparsedWorkoutDate of
         Left err -> displayPage $ errorPage err
         Right (id, date) -> do
-          createdWorkout <- liftIO $ createWorkout conn (CreateWorkoutInput (if T.null workoutType then "Keine Angabe" else workoutType) date id)
+          createdWorkout <- liftIO $ createWorkout conn (CreateWorkoutInput (if T.null workoutType then "Keine Angabe" else workoutType) date id workoutNote)
           if isJust createdWorkout then redirect ("/" <> "?success=true") else displayPage $ errorPage "error creating workout"
 
     post "/api/update-workout" $ do
