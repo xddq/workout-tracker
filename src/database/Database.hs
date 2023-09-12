@@ -80,7 +80,8 @@ data CreateExerciseInput = CreateExerciseInput
 data Workout = Workout
   { workoutId :: Int,
     workoutType :: Text,
-    workoutDate :: Day
+    workoutDate :: Day,
+    workoutNote :: Text
   }
   deriving (Show, Generic, FromRow, ToRow)
 
@@ -136,8 +137,15 @@ unsafeGetWorkoutById conn x = do
 getWorkoutById :: Connection -> Int -> IO (Either Text Workout)
 getWorkoutById conn id = catchDbExceptions (unsafeGetWorkoutById conn id)
 
-updateWorkout :: Connection -> Workout -> IO [Workout]
-updateWorkout conn (Workout workoutId workoutType workoutDate) = query conn "UPDATE workouts SET type=?, date=? WHERE id=? RETURNING *" (workoutType, workoutDate, workoutId)
+unsafeUpdateWorkout :: Connection -> Workout -> IO (Either Text Workout)
+unsafeUpdateWorkout conn (Workout workoutId workoutType workoutDate workoutNote) = do
+  workoutList <- query conn "UPDATE workouts SET type=?, date=?, note=? WHERE id=? RETURNING *" (workoutType, workoutDate, workoutNote, workoutId) :: IO [Workout]
+  case listToMaybe workoutList of
+    Just workout -> return $ Right workout
+    Nothing -> return $ Left "error updating workout"
+
+updateWorkout :: Connection -> Workout -> IO (Either Text Workout)
+updateWorkout conn workout = catchDbExceptions (unsafeUpdateWorkout conn workout)
 
 unsafeGetExercisesForWorkout :: Connection -> Int -> IO (Either Text [Exercise])
 unsafeGetExercisesForWorkout conn workoutId = do

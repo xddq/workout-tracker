@@ -138,6 +138,32 @@ mkApp conn =
           createdWorkout <- liftIO $ createWorkout conn (CreateWorkoutInput (if T.null workoutType then "Keine Angabe" else workoutType) date id)
           if isJust createdWorkout then redirect ("/" <> "?success=true") else displayPage $ errorPage "error creating workout"
 
+    post "/api/update-workout" $ do
+      let parseInput :: Text -> Text -> Either Text (Int, Day)
+          parseInput id date = (,) <$> textToEitherInt id <*> textToDate date
+      workoutType <- param "type"
+      workoutNote <- param "note"
+      unparsedWorkoutId <- param "id"
+      unparsedWorkoutDate <- param "date"
+      case parseInput unparsedWorkoutId unparsedWorkoutDate of
+        Left err -> displayPage $ errorPage err
+        Right (workoutId, date) -> do
+          workoutEither <- liftIO $ updateWorkout conn (Workout workoutId workoutType date workoutNote)
+          case workoutEither of
+            Left err -> displayPage $ errorPage err
+            Right workout -> redirect ("/" <> "?success=true")
+
+    post "/api/delete-workout" $ do
+      unparsedWorkoutId <- param "workoutId"
+      case textToEitherInt unparsedWorkoutId of
+        Left err -> displayPage $ errorPage err
+        Right id -> do
+          deletedRowsCount <- liftIO $ deleteWorkoutWithExercises conn id
+          either
+            (displayPage . errorPage)
+            (\_ -> redirect ("/" <> "?success=true"))
+            deletedRowsCount
+
     post "/api/create-exercise" $ do
       let parseInput :: Text -> Text -> Text -> Either Text ([Int], [Int], Int)
           parseInput unparsedReps unparsedWeights unparsedWorkoutId = do
@@ -215,29 +241,6 @@ mkApp conn =
           case deletedExercise of
             Just x -> redirect ("/workouts/" <> pack (show workoutId) <> "/show?success=true")
             Nothing -> displayPage $ errorPage "error deleting exercise"
-
-    post "/api/update-workout" $ do
-      let parseInput :: Text -> Text -> Either Text (Int, Day)
-          parseInput id date = (,) <$> textToEitherInt id <*> textToDate date
-      workoutType <- param "type"
-      unparsedWorkoutId <- param "id"
-      unparsedWorkoutDate <- param "date"
-      case parseInput unparsedWorkoutId unparsedWorkoutDate of
-        Left err -> displayPage $ errorPage err
-        Right (workoutId, date) -> do
-          _updatedItem <- liftIO $ updateWorkout conn (Workout workoutId workoutType date)
-          displayPage successPage
-
-    post "/api/delete-workout" $ do
-      unparsedWorkoutId <- param "workoutId"
-      case textToEitherInt unparsedWorkoutId of
-        Left err -> displayPage $ errorPage err
-        Right id -> do
-          deletedRowsCount <- liftIO $ deleteWorkoutWithExercises conn id
-          either
-            (displayPage . errorPage)
-            (\_ -> redirect ("/" <> "?success=true"))
-            deletedRowsCount
 
 -- TODO: later use newtype wrapper
 type Position = Int
