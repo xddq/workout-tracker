@@ -11,7 +11,15 @@ module Database
     updateWorkout,
     CreateWorkoutInput (CreateWorkoutInput, createWorkoutInputDate, createWorkoutInputType),
     Workout (Workout, workoutId, workoutDate, workoutType),
-    Exercise (Exercise, exerciseId, exerciseTitle, exerciseReps, exerciseNote, exercisePosition, exerciseWorkoutId, exerciseWeightsInKg),
+    mkExercise,
+    Exercise,
+    exerciseId,
+    exerciseTitle,
+    exerciseReps,
+    exerciseNote,
+    exercisePosition,
+    exerciseWorkoutId,
+    exerciseWeightsInKg,
     getHighestPositionByWorkoutId,
     getExercisesForWorkout,
     getExerciseById,
@@ -19,7 +27,14 @@ module Database
     updatePositionOfExercise,
     updatePositionsOfExercises,
     deleteWorkoutWithExercises,
-    CreateExerciseInput (CreateExerciseInput, createExerciseInputTitle, createExerciseInputReps, createExerciseInputNote, createExerciseInputPosition, createExerciseInputExerciseWorkoutId, createExerciseInputWeightsInKg),
+    mkCreateExerciseInput,
+    CreateExerciseInput,
+    createExerciseInputTitle,
+    createExerciseInputReps,
+    createExerciseInputNote,
+    createExerciseInputPosition,
+    createExerciseInputExerciseWorkoutId,
+    createExerciseInputWeightsInKg,
     createExercise,
     updateExercise,
     repsToText,
@@ -45,10 +60,48 @@ import Database.PostgreSQL.Simple.TypeInfo.Static (int4Oid, typoid)
 import Database.PostgreSQL.Simple.Types (PGArray (PGArray))
 import GHC.Generics (Generic)
 
--- We want to add an exception for the case "trying to delete something from the database and deleting 0 rows"
+-- We add an exception for the case "trying to delete an entity from the
+-- database and deleting 0 rows"
 data CustomDbException = NoDeletedRows deriving (Show)
 
 instance Exception CustomDbException
+
+type ExerciseId = Int
+
+type ExerciseTitle = Text
+
+type ExerciseReps = [Int]
+
+type ExerciseNote = Text
+
+type ExercisePosition = Int
+
+type ExerciseWorkoutId = Int
+
+type ExerciseWeightsInKg = [Int]
+
+-- Using smart constructor to create an exercise so that we avoid using PGArray
+-- in other parts of the app besides the database.
+-- The smart constructor also verifies (and if possible, fixes instead of fails)
+-- that the input format is correct (length of reps list is equal to length of
+-- weights list).
+mkExercise :: ExerciseId -> ExerciseTitle -> ExerciseReps -> ExerciseNote -> ExercisePosition -> ExerciseWorkoutId -> ExerciseWeightsInKg -> Either Text Exercise
+mkExercise id title reps note position workoutId weightsInKg = do
+  -- Matching on "Right" case of the parseRepsAndWeights to enable short
+  -- circuiting with the error in case the parsing failed.
+  -- TODO: do we have to use the parseReps and parsedWeights in order to have
+  -- the short circuiting? Or is using a tuple with matchall (_,_) enough?
+  (parsedReps, parsedWeights) <- parseRepsAndWeights reps weightsInKg
+  return $ Exercise id title (PGArray parsedReps) note position workoutId (PGArray parsedWeights)
+
+-- Ensures that if we pass a different amount of sets based on reps and weights,
+-- we get an error. If we pass for one of them a list with a single value, we
+-- assume that the amount of reps or weights was used for the whole set and
+-- adapt it accordingly.
+parseRepsAndWeights :: ExerciseReps -> ExerciseWeightsInKg -> Either Text (ExerciseReps, ExerciseWeightsInKg)
+parseRepsAndWeights reps@[x] weights@(y : ys) = Right (replicate (length weights) x, weights)
+parseRepsAndWeights reps@(x : xs) weights@[y] = Right (reps, replicate (length reps) y)
+parseRepsAndWeights reps weights = if length reps == length weights then Right (reps, weights) else Left "The amount of sets (based on reps) was not equal to the amount of sets (based on weights)"
 
 data Exercise = Exercise
   { exerciseId :: Int,
@@ -66,6 +119,9 @@ repsToText (PGArray xs) = foldl (\acc curr -> if null acc then show curr else ac
 
 weightsToText :: PGArray Int -> String
 weightsToText = repsToText
+
+mkCreateExerciseInput :: ExerciseTitle -> ExerciseReps -> ExerciseNote -> ExercisePosition -> ExerciseWorkoutId -> ExerciseWeightsInKg -> CreateExerciseInput
+mkCreateExerciseInput title reps note position workoutId weights = CreateExerciseInput title (PGArray reps) note position workoutId (PGArray weights)
 
 data CreateExerciseInput = CreateExerciseInput
   { createExerciseInputTitle :: Text,
@@ -257,10 +313,8 @@ unsafeUpdateExercise conn (Exercise id title reps note position workoutId weight
 updateExercise :: Connection -> Exercise -> IO (Either Text Exercise)
 updateExercise conn x = catchDbExceptions (unsafeUpdateExercise conn x)
 
--- TODO: later use newtype wrapper
+-- TODO: later use newtype wrapper?
 type Position = Int
-
-type ExerciseId = Int
 
 updatePositionOfExercise :: Connection -> (Position, ExerciseId) -> IO (Maybe Exercise)
 updatePositionOfExercise conn (position, id) = do

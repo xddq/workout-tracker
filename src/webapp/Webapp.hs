@@ -15,7 +15,7 @@ import qualified Data.Text.Lazy as T
 import Data.Text.Lazy.Encoding (decodeUtf8)
 import Data.Text.Lazy.Read (decimal)
 import Data.Time (Day, UTCTime (utctDay), defaultTimeLocale, formatTime, getCurrentTime, parseTimeM)
-import Database (CreateExerciseInput (CreateExerciseInput), CreateWorkoutInput (CreateWorkoutInput), Exercise (Exercise, exerciseWorkoutId), Workout (Workout, workoutId), createExercise, createWorkout, deleteExerciseById, deleteWorkoutWithExercises, getExerciseById, getExercisesForWorkout, getHighestPositionByWorkoutId, getWorkoutById, getWorkouts, maybeToRight, updateExercise, updatePositionOfExercise, updatePositionsOfExercises, updateWorkout)
+import Database (CreateExerciseInput, CreateWorkoutInput (CreateWorkoutInput), Exercise, Workout (Workout, workoutId), createExercise, createWorkout, deleteExerciseById, deleteWorkoutWithExercises, exerciseWorkoutId, getExerciseById, getExercisesForWorkout, getHighestPositionByWorkoutId, getWorkoutById, getWorkouts, maybeToRight, mkCreateExerciseInput, mkExercise, updateExercise, updatePositionOfExercise, updatePositionsOfExercises, updateWorkout)
 import Database.PostgreSQL.Simple (Connection)
 import Database.PostgreSQL.Simple.Types (PGArray (PGArray))
 import GHC.Generics (Generic)
@@ -181,7 +181,7 @@ mkApp conn =
           case position of
             Left err -> displayPage $ errorPage err
             Right position -> do
-              createdExercise <- liftIO $ createExercise conn (CreateExerciseInput title (PGArray reps) note position workoutId (PGArray weights))
+              createdExercise <- liftIO $ createExercise conn (mkCreateExerciseInput title reps note position workoutId weights)
               either
                 (displayPage . errorPage)
                 (\x -> redirect ("/workouts/" <> pack (show $ exerciseWorkoutId x) <> "/show?success=true"))
@@ -219,11 +219,14 @@ mkApp conn =
       case parseInput unparsedExerciseId unparsedReps unparsedPosition unparsedWeights unparsedWorkoutId of
         Left err -> displayPage $ errorPage err
         Right (id, reps, position, weights, workoutId) -> do
-          updatedExercise <- liftIO $ updateExercise conn (Exercise id title (PGArray reps) note position workoutId (PGArray weights))
-          either
-            (displayPage . errorPage)
-            (\x -> redirect ("/workouts/" <> pack (show $ exerciseWorkoutId x) <> "/show?success=true"))
-            updatedExercise
+          case mkExercise id title reps note position workoutId weights of
+            Left err -> displayPage $ errorPage err
+            Right exercise -> do
+              updatedExercise <- liftIO $ updateExercise conn exercise
+              either
+                (displayPage . errorPage)
+                (\x -> redirect ("/workouts/" <> pack (show $ exerciseWorkoutId x) <> "/show?success=true"))
+                updatedExercise
 
     post "/api/delete-exercise" $ do
       let parseInput :: Text -> Text -> Text -> Text -> Text -> Either Text (Int, [Int], Int, [Int], Int)
@@ -238,10 +241,13 @@ mkApp conn =
       case parseInput unparsedExerciseId unparsedReps unparsedPosition unparsedWeights unparsedWorkoutId of
         Left err -> displayPage $ errorPage err
         Right (exerciseId, reps, position, weights, workoutId) -> do
-          deletedExercise <- liftIO $ deleteExerciseById conn (Exercise exerciseId title (PGArray reps) note position workoutId (PGArray weights))
-          case deletedExercise of
-            Just x -> redirect ("/workouts/" <> pack (show workoutId) <> "/show?success=true")
-            Nothing -> displayPage $ errorPage "error deleting exercise"
+          case mkExercise exerciseId title reps note position workoutId weights of
+            Left err -> displayPage $ errorPage err
+            Right exercise -> do
+              deletedExercise <- liftIO $ deleteExerciseById conn exercise
+              case deletedExercise of
+                Just x -> redirect ("/workouts/" <> pack (show workoutId) <> "/show?success=true")
+                Nothing -> displayPage $ errorPage "error deleting exercise"
 
 -- TODO: later use newtype wrapper
 type Position = Int

@@ -22,7 +22,7 @@ where
 import Control.Monad (forM_)
 import Data.Text.Lazy (Text, pack, split, unpack)
 import Data.Time (Day, defaultTimeLocale, formatTime)
-import Database (Exercise (Exercise, exerciseId, exerciseNote, exercisePosition, exerciseReps, exerciseTitle, exerciseWeightsInKg, exerciseWorkoutId), Workout (Workout, workoutDate, workoutId, workoutType), repsToText, weightsToText)
+import Database (Exercise, Workout (Workout, workoutDate, workoutId, workoutType), exerciseId, exerciseNote, exercisePosition, exerciseReps, exerciseTitle, exerciseWeightsInKg, exerciseWorkoutId, repsToText, weightsToText)
 import Text.Blaze.Html.Renderer.Text (renderHtml)
 import Text.Blaze.Html5 as H
 import Text.Blaze.Html5.Attributes as A
@@ -251,16 +251,16 @@ displayExerciseListSnippet xs = do
     if null xs then mempty else H.div $ a ! href (toValue $ "/workouts/" ++ show (exerciseWorkoutId $ Prelude.head xs) ++ "/exercises/order") ! class_ "button is-primary" $ "Reihenfolge anpassen"
 
 displayExerciseListItemSnippet :: Exercise -> Html
-displayExerciseListItemSnippet (Exercise id title reps note position workoutId weights) = do
+displayExerciseListItemSnippet exercise = do
   H.tr $ do
-    H.td $ toHtml position
-    H.td $ toHtml title
+    H.td $ toHtml $ exercisePosition exercise
+    H.td $ toHtml $ exerciseTitle exercise
     -- TODO: why not PGArray Int here..?
-    H.td $ toHtml $ weightsToText weights
-    H.td $ toHtml $ repsToText reps
-    H.td $ toHtml note
-    H.td $ a ! href (toValue $ "/exercises/" ++ show id ++ "/edit") ! class_ "button is-primary" $ "Bearbeiten"
-    H.td $ a ! href (toValue $ "/exercises/" ++ show id ++ "/delete") ! class_ "button is-danger" $ "Löschen"
+    H.td $ toHtml $ weightsToText $ exerciseWeightsInKg exercise
+    H.td $ toHtml $ repsToText $ exerciseReps exercise
+    H.td $ toHtml $ exerciseNote exercise
+    H.td $ a ! href (toValue $ "/exercises/" ++ show (exerciseId exercise) ++ "/edit") ! class_ "button is-primary" $ "Bearbeiten"
+    H.td $ a ! href (toValue $ "/exercises/" ++ show (exerciseId exercise) ++ "/delete") ! class_ "button is-danger" $ "Löschen"
 
 displayOrderExerciseListSnippet :: [Exercise] -> Html
 displayOrderExerciseListSnippet xs =
@@ -281,12 +281,12 @@ displayOrderExerciseListSnippet xs =
       H.div ! class_ "field" $ H.div ! class_ "control" $ input ! class_ "button is-link" ! type_ "submit" ! value "Reihenfolge speichern"
 
 displayOrderExerciseListItemSnippet :: Exercise -> Html
-displayOrderExerciseListItemSnippet (Exercise id title reps note position weightInKg workoutId) = do
+displayOrderExerciseListItemSnippet exercise = do
   H.tr $ do
-    H.td $ H.div ! class_ "control" $ input ! class_ "input" ! type_ "number" ! name "position[]" ! required "" ! value (toValue position) ! A.min "1"
-    H.td $ toHtml title
-    H.td $ toHtml $ repsToText reps
-  input ! type_ "hidden" ! name "exerciseId[]" ! value (toValue id)
+    H.td $ H.div ! class_ "control" $ input ! class_ "input" ! type_ "number" ! name "position[]" ! required "" ! value (toValue $ exercisePosition exercise) ! A.min "1"
+    H.td $ toHtml $ exerciseTitle exercise
+    H.td $ toHtml $ repsToText $ exerciseReps exercise
+  input ! type_ "hidden" ! name "exerciseId[]" ! value (toValue $ exerciseId exercise)
 
 redirectToHomeSnippet :: Html
 redirectToHomeSnippet = p $ do
