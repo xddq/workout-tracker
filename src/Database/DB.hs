@@ -4,7 +4,7 @@
 -- to use "" for Text
 {-# LANGUAGE OverloadedStrings #-}
 
-module Database
+module Database.DB
   ( createWorkout,
     getWorkouts,
     getWorkoutById,
@@ -50,6 +50,8 @@ import Data.List (sortBy, sortOn)
 import Data.Maybe (fromMaybe, listToMaybe)
 import Data.Text.Lazy (Text, pack, unpack)
 import Data.Time (Day)
+-- import everything from our module Database.Model
+import Database.Model
 import Database.PostgreSQL.Simple (Connection, FromRow, Only (Only), ResultError (ConversionFailed), SomePostgreSqlException (SomePostgreSqlException), ToRow, execute, executeMany, query, query_, withTransaction)
 import Database.PostgreSQL.Simple.FromField (Field (typeOid), FromField (..), returnError)
 import Database.PostgreSQL.Simple.FromRow (FromRow (fromRow), field)
@@ -59,120 +61,6 @@ import Database.PostgreSQL.Simple.TypeInfo
 import Database.PostgreSQL.Simple.TypeInfo.Static (int4Oid, typoid)
 import Database.PostgreSQL.Simple.Types (PGArray (PGArray))
 import GHC.Generics (Generic)
-
--- We add an exception for the case "trying to delete an entity from the
--- database and deleting 0 rows"
-data CustomDbException = NoDeletedRows deriving (Show)
-
-instance Exception CustomDbException
-
-type ExerciseId = Int
-
-type ExerciseTitle = Text
-
-type ExerciseReps = [Int]
-
-type ExerciseNote = Text
-
-type ExercisePosition = Int
-
-type ExerciseWorkoutId = Int
-
-type ExerciseWeightsInKg = [Int]
-
--- Using smart constructor to create an exercise so that we avoid using PGArray
--- in other parts of the app besides the database.
--- The smart constructor also verifies (and if possible, fixes instead of fails)
--- that the input format is correct (length of reps list is equal to length of
--- weights list).
-mkExercise :: ExerciseId -> ExerciseTitle -> ExerciseReps -> ExerciseNote -> ExercisePosition -> ExerciseWorkoutId -> ExerciseWeightsInKg -> Either Text Exercise
-mkExercise id title reps note position workoutId weightsInKg = do
-  -- Matching on "Right" case of the parseRepsAndWeights to enable short
-  -- circuiting with the error in case the parsing failed.
-  -- TODO: do we have to use the parseReps and parsedWeights in order to have
-  -- the short circuiting? Or is using a tuple with matchall (_,_) enough?
-  (parsedReps, parsedWeights) <- parseRepsAndWeights reps weightsInKg
-  return $ Exercise id title (PGArray parsedReps) note position workoutId (PGArray parsedWeights)
-
--- Ensures that if we pass a different amount of sets based on reps and weights,
--- we get an error. If we pass for one of them a list with a single value, we
--- assume that the amount of reps or weights was used for the whole set and
--- adapt it accordingly.
-parseRepsAndWeights :: ExerciseReps -> ExerciseWeightsInKg -> Either Text (ExerciseReps, ExerciseWeightsInKg)
-parseRepsAndWeights reps@[x] weights@(y : ys) = Right (replicate (length weights) x, weights)
-parseRepsAndWeights reps@(x : xs) weights@[y] = Right (reps, replicate (length reps) y)
-parseRepsAndWeights reps weights = if length reps == length weights then Right (reps, weights) else Left "The amount of sets (based on reps) was not equal to the amount of sets (based on weights)"
-
-data Exercise = Exercise
-  { exerciseId :: Int,
-    exerciseTitle :: Text,
-    exerciseReps :: PGArray Int,
-    exerciseNote :: Text,
-    exercisePosition :: Int,
-    exerciseWorkoutId :: Int,
-    exerciseWeightsInKg :: PGArray Int
-  }
-  deriving (Show, Generic, FromRow, ToRow)
-
-repsToText :: PGArray Int -> String
-repsToText (PGArray xs) = foldl (\acc curr -> if null acc then show curr else acc ++ "," ++ show curr) "" xs
-
-weightsToText :: PGArray Int -> String
-weightsToText = repsToText
-
-mkCreateExerciseInput :: ExerciseTitle -> ExerciseReps -> ExerciseNote -> ExercisePosition -> ExerciseWorkoutId -> ExerciseWeightsInKg -> CreateExerciseInput
-mkCreateExerciseInput title reps note position workoutId weights = CreateExerciseInput title (PGArray reps) note position workoutId (PGArray weights)
-
-data CreateExerciseInput = CreateExerciseInput
-  { createExerciseInputTitle :: Text,
-    createExerciseInputReps :: PGArray Int,
-    createExerciseInputNote :: Text,
-    createExerciseInputPosition :: Int,
-    createExerciseInputExerciseWorkoutId :: Int,
-    createExerciseInputWeightsInKg :: PGArray Int
-  }
-  deriving (Show, Generic, FromRow, ToRow)
-
-data Workout = Workout
-  { workoutId :: Int,
-    workoutType :: Text,
-    workoutDate :: Day,
-    workoutNote :: Text
-  }
-  deriving (Show, Generic, FromRow, ToRow)
-
-data CreateWorkoutInput = CreateWorkoutInput
-  { createWorkoutInputType :: Text,
-    createWorkoutInputDate :: Day,
-    createWorkoutInputPrefillWorkoutId :: Int,
-    createWorkoutInputNote :: Text
-  }
-  deriving (Show, Generic, FromRow, ToRow)
-
--- TODO/MAYBE (low prio): Adapt all the other db call functions to also use an
--- unsafe version and adapt the normal version to return Either Text a. Did this
--- for some (e.g. unsafeDeleteWorkoutWithExercises) and understood the approach
--- and concept (which was my goal).
-createWorkout :: Connection -> CreateWorkoutInput -> IO (Maybe Workout)
-createWorkout conn x = do
-  createdWorkout <- query conn "INSERT INTO workouts (type, date, note) VALUES (?,?,?) RETURNING *" (createWorkoutInputType x, createWorkoutInputDate x, createWorkoutInputNote x) :: IO [Workout]
-  case listToMaybe createdWorkout of
-    Nothing -> return Nothing
-    Just workout -> do
-      if createWorkoutInputPrefillWorkoutId x == -1
-        then return (Just workout)
-        else do
-          Right exercises <- getExercisesForWorkout conn (createWorkoutInputPrefillWorkoutId x)
-          mapM_ (createExercise conn) (map (exerciseToCreateExerciseInput $ workoutId workout) exercises)
-          return $ Just workout
-  where
-    exerciseToCreateExerciseInput workoutId ex = CreateExerciseInput (exerciseTitle ex) (exerciseReps ex) (exerciseNote ex) (exercisePosition ex) workoutId (exerciseWeightsInKg ex)
-
--- TODO: perhaps move this into a util package..? Or decide which other
--- package to install and to import it from..?
-maybeToRight :: Text -> Maybe a -> Either Text a
-maybeToRight err Nothing = Left err
-maybeToRight _ (Just x) = Right x
 
 -- using Either Text [Workout] here to be able to use the catchDbExceptions
 -- function similar to the other functions
@@ -313,6 +201,25 @@ unsafeUpdateExercise conn (Exercise id title reps note position workoutId weight
 updateExercise :: Connection -> Exercise -> IO (Either Text Exercise)
 updateExercise conn x = catchDbExceptions (unsafeUpdateExercise conn x)
 
+-- TODO/MAYBE (low prio): Adapt all the other db call functions to also use an
+-- unsafe version and adapt the normal version to return Either Text a. Did this
+-- for some (e.g. unsafeDeleteWorkoutWithExercises) and understood the approach
+-- and concept (which was my goal).
+createWorkout :: Connection -> CreateWorkoutInput -> IO (Maybe Workout)
+createWorkout conn x = do
+  createdWorkout <- query conn "INSERT INTO workouts (type, date, note) VALUES (?,?,?) RETURNING *" (createWorkoutInputType x, createWorkoutInputDate x, createWorkoutInputNote x) :: IO [Workout]
+  case listToMaybe createdWorkout of
+    Nothing -> return Nothing
+    Just workout -> do
+      if createWorkoutInputPrefillWorkoutId x == -1
+        then return (Just workout)
+        else do
+          Right exercises <- getExercisesForWorkout conn (createWorkoutInputPrefillWorkoutId x)
+          mapM_ (createExercise conn) (map (exerciseToCreateExerciseInput $ workoutId workout) exercises)
+          return $ Just workout
+  where
+    exerciseToCreateExerciseInput workoutId ex = CreateExerciseInput (exerciseTitle ex) (exerciseReps ex) (exerciseNote ex) (exercisePosition ex) workoutId (exerciseWeightsInKg ex)
+
 -- TODO: later use newtype wrapper?
 type Position = Int
 
@@ -325,3 +232,15 @@ updatePositionsOfExercises :: Connection -> [(Position, ExerciseId)] -> IO (Mayb
 updatePositionsOfExercises conn xs = do
   rowsAffected <- executeMany conn "UPDATE exercises SET position = upd.position FROM (VALUES (?,?)) as upd(position,id) WHERE exercises.id = upd.id" xs :: IO Int64
   if rowsAffected == 0 then return Nothing else return $ Just $ fromIntegral rowsAffected
+
+repsToText :: PGArray Int -> String
+repsToText (PGArray xs) = foldl (\acc curr -> if null acc then show curr else acc ++ "," ++ show curr) "" xs
+
+weightsToText :: PGArray Int -> String
+weightsToText = repsToText
+
+-- TODO: perhaps move this into a util package..? Or decide which other
+-- package to install and to import it from..?
+maybeToRight :: Text -> Maybe a -> Either Text a
+maybeToRight err Nothing = Left err
+maybeToRight _ (Just x) = Right x
