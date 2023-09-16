@@ -72,9 +72,7 @@ getWorkoutById conn id = catchDbExceptions (unsafeGetWorkoutById conn id)
 unsafeUpdateWorkout :: Connection -> Workout -> IO (Either Text Workout)
 unsafeUpdateWorkout conn (Workout workoutId workoutType workoutDate workoutNote) = do
   workoutList <- query conn "UPDATE workouts SET type=?, date=?, note=? WHERE id=? RETURNING *" (workoutType, workoutDate, workoutNote, workoutId) :: IO [Workout]
-  case listToMaybe workoutList of
-    Just workout -> return $ Right workout
-    Nothing -> return $ Left "error updating workout"
+  return $ listToEither "error updating workout" workoutList
 
 updateWorkout :: Connection -> Workout -> IO (Either Text Workout)
 updateWorkout conn workout = catchDbExceptions (unsafeUpdateWorkout conn workout)
@@ -162,24 +160,16 @@ getHighestPositionByWorkoutId conn workoutId = catchDbExceptions (unsafeGetHighe
 
 unsafeCreateExercise :: Connection -> CreateExerciseInput -> IO (Either Text Exercise)
 unsafeCreateExercise conn (CreateExerciseInput title reps note position workoutId weights) = do
-  result <- query conn "INSERT INTO exercises (title, reps, note, position, workout_id, weight_in_kg) VALUES (?,?,?,?,?,?) RETURNING *" (title, reps, note, position, workoutId, weights)
-  case listToMaybe result of
-    Just exercise -> do
-      print exercise
-      return $ Right exercise
-    Nothing -> do
-      print "error"
-      return $ Left "Error creating the exercise. The 'returning *' gave us an empty list."
+  exerciseList <- query conn "INSERT INTO exercises (title, reps, note, position, workout_id, weight_in_kg) VALUES (?,?,?,?,?,?) RETURNING *" (title, reps, note, position, workoutId, weights)
+  return $ listToEither "error creating exercise" exerciseList
 
 createExercise :: Connection -> CreateExerciseInput -> IO (Either Text Exercise)
 createExercise conn x = catchDbExceptions (unsafeCreateExercise conn x)
 
 unsafeUpdateExercise :: Connection -> Exercise -> IO (Either Text Exercise)
 unsafeUpdateExercise conn (Exercise id title reps note position workoutId weights) = do
-  result <- query conn "UPDATE exercises SET title=?, reps=?, note=?, position=?, workout_id=?, weight_in_kg=?  WHERE id=? RETURNING *" (title, reps, note, position, workoutId, weights, id) :: IO [Exercise]
-  case listToMaybe result of
-    Just exercise -> return $ Right exercise
-    Nothing -> return $ Left "Error updating the exercise. The 'returning *' gave us an empty list."
+  exerciseList <- query conn "UPDATE exercises SET title=?, reps=?, note=?, position=?, workout_id=?, weight_in_kg=?  WHERE id=? RETURNING *" (title, reps, note, position, workoutId, weights, id) :: IO [Exercise]
+  return $ listToEither "error updating the exercise" exerciseList
 
 updateExercise :: Connection -> Exercise -> IO (Either Text Exercise)
 updateExercise conn x = catchDbExceptions (unsafeUpdateExercise conn x)
@@ -212,10 +202,8 @@ type Position = Int
 -- Using NonEmpty list here in order to store our evidence (list contains > 0 elements) in the type to avoid having to recheck the result of this function for this case once again.
 unsafeUpdatePositionsOfExercises :: Connection -> [(Position, ExerciseId)] -> IO (Either Text (NE.NonEmpty Exercise))
 unsafeUpdatePositionsOfExercises conn xs = do
-  exercises <- returning conn "UPDATE exercises SET position = upd.position FROM (VALUES (?,?)) as upd(position,id) WHERE exercises.id = upd.id" xs :: IO [Exercise]
-  case maybeToEither "Updating did not update any exercise." $ NE.nonEmpty exercises of
-    Right exerciseList -> return $ Right exerciseList
-    Left err -> return $ Left err
+  exercises <- returning conn "UPDATE exercises SET position = upd.position FROM (VALUES (?,?)) as upd(position,id) WHERE exercises.id = upd.id RETURNING exercises.*" xs :: IO [Exercise]
+  return $ maybeToEither "Updating did not update any exercise." $ NE.nonEmpty exercises
 
 updatePositionsOfExercises :: Connection -> [(Position, ExerciseId)] -> IO (Either Text (NE.NonEmpty Exercise))
 updatePositionsOfExercises conn xs = catchDbExceptions (unsafeUpdatePositionsOfExercises conn xs)
