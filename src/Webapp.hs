@@ -184,11 +184,14 @@ mkApp conn =
           case position of
             Left err -> displayPage $ errorPage err
             Right position -> do
-              createdExercise <- liftIO $ createExercise conn (mkCreateExerciseInput title reps note position workoutId weights)
-              either
-                (displayPage . errorPage)
-                (\x -> redirect ("/workouts/" <> pack (show $ exerciseWorkoutId x) <> "/show?success=true"))
-                createdExercise
+              case mkCreateExerciseInput title reps note position workoutId weights of
+                Left err -> displayPage $ errorPage err
+                Right createExerciseInput -> do
+                  createdExercise <- liftIO $ createExercise conn createExerciseInput
+                  either
+                    (displayPage . errorPage)
+                    (\x -> redirect ("/workouts/" <> pack (show $ exerciseWorkoutId x) <> "/show?success=true"))
+                    createdExercise
 
     -- bulk updates exercises, used for updating their position/order
     post "/api/update-exercises" $ do

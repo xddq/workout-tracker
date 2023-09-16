@@ -74,8 +74,10 @@ data Exercise = Exercise
   }
   deriving (Show, Generic, FromRow, ToRow)
 
-mkCreateExerciseInput :: ExerciseTitle -> ExerciseReps -> ExerciseNote -> ExercisePosition -> ExerciseWorkoutId -> ExerciseWeightsInKg -> CreateExerciseInput
-mkCreateExerciseInput title reps note position workoutId weights = CreateExerciseInput title (PGArray reps) note position workoutId (PGArray weights)
+mkCreateExerciseInput :: ExerciseTitle -> ExerciseReps -> ExerciseNote -> ExercisePosition -> ExerciseWorkoutId -> ExerciseWeightsInKg -> Either Text CreateExerciseInput
+mkCreateExerciseInput title reps note position workoutId weights = do
+  (parsedReps, parsedWeights) <- parseRepsAndWeights reps weights
+  return $ CreateExerciseInput title (PGArray parsedReps) note position workoutId (PGArray parsedWeights)
 
 data CreateExerciseInput = CreateExerciseInput
   { createExerciseInputTitle :: Text,
