@@ -1,13 +1,13 @@
 cabal-version:       2.4
-Name:                haskell-simple-todo
+Name:                workout-tracker
 Version:             0.1.0
-Homepage:            https://github.com/xddq/spending-tracker
-Bug-reports:         https://github.com/xddq/spending-tracker
+Homepage:            https://github.com/xddq/workout-tracker
+Bug-reports:         https://github.com/xddq/workout-tracker
 Category:            Web
 
 library webapp
   exposed-modules:     Webapp
-  other-modules:       Views.Util, Views.Page, Views.Workout, Views.Exercise, Database.DB, Database.Model
+  other-modules:       Views.Util, Views.Page, Views.Workout, Views.Exercise, Database.DB, Database.Model, Database.Util
   hs-source-dirs:      src
   default-language:    Haskell2010
   build-depends:       base >= 4.16 && < 4.17,
@@ -28,13 +28,14 @@ library webapp
                        mtl == 2.3.1,
                        -- our database
                        database,
-                       -- our views
                        blaze-html == 0.9.1.2,
+                       -- our views
                        views,
                        time == 1.12.2,
 
 library database
-  exposed-modules:     Database.DB Database.Model
+  exposed-modules:     Database.DB
+  other-modules:       Database.Model, Database.Util
   hs-source-dirs:      src
   default-language:    Haskell2010
   build-depends:       base >= 4.16 && < 4.17,
@@ -48,7 +49,7 @@ library database
 
 library views
   exposed-modules:     Views.Page
-  other-modules:       Views.Util, Views.Workout, Views.Exercise, Database.DB, Database.Model
+  other-modules:       Views.Util, Views.Workout, Views.Exercise, Database.DB, Database.Model, Database.Util
   hs-source-dirs:      src
   default-language:    Haskell2010
   build-depends:       base >= 4.16 && < 4.17,
@@ -61,7 +62,7 @@ library views
                        bytestring == 0.11.4.0,
                        postgresql-simple == 0.7.0.0,
 
-executable todo-app
+executable app
   main-is:             Main.hs
   default-language:    Haskell2010
   hs-source-dirs:      app

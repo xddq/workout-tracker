@@ -8,6 +8,7 @@ import Control.Monad.Identity (IdentityT (IdentityT, runIdentityT))
 import Data.Aeson (FromJSON (parseJSON), Result (Error, Success), ToJSON (toJSON), Value, decode, encode, fromJSON, object, withObject, (.:), (.=))
 import Data.Either (fromLeft, isLeft)
 import Data.List (sortOn)
+import qualified Data.List.NonEmpty as NE
 import Data.Maybe (fromJust, isJust, listToMaybe)
 import Data.String (IsString (fromString))
 import Data.Text.Lazy (Text, null, pack, split, unpack)
@@ -15,7 +16,7 @@ import qualified Data.Text.Lazy as T
 import Data.Text.Lazy.Encoding (decodeUtf8)
 import Data.Text.Lazy.Read (decimal)
 import Data.Time (Day, UTCTime (utctDay), defaultTimeLocale, formatTime, getCurrentTime, parseTimeM)
-import Database.DB (CreateExerciseInput, CreateWorkoutInput (CreateWorkoutInput), Exercise, Workout (Workout, workoutId), createExercise, createWorkout, deleteExerciseById, deleteWorkoutWithExercises, exerciseWorkoutId, getExerciseById, getExercisesForWorkout, getHighestPositionByWorkoutId, getWorkoutById, getWorkouts, maybeToRight, mkCreateExerciseInput, mkExercise, updateExercise, updatePositionOfExercise, updatePositionsOfExercises, updateWorkout)
+import Database.DB (CreateExerciseInput, CreateWorkoutInput (CreateWorkoutInput), Exercise, Workout (Workout, workoutId), createExercise, createWorkout, deleteExerciseById, deleteWorkoutWithExercises, exerciseWorkoutId, getExerciseById, getExercisesForWorkout, getHighestPositionByWorkoutId, getWorkoutById, getWorkouts, mkCreateExerciseInput, mkExercise, updateExercise, updatePositionsOfExercises, updateWorkout)
 import Database.PostgreSQL.Simple (Connection)
 import Database.PostgreSQL.Simple.Types (PGArray (PGArray))
 import GHC.Generics (Generic)
@@ -137,7 +138,9 @@ mkApp conn =
         Left err -> displayPage $ errorPage err
         Right (id, date) -> do
           createdWorkout <- liftIO $ createWorkout conn (CreateWorkoutInput (if T.null workoutType then "Keine Angabe" else workoutType) date id workoutNote)
-          if isJust createdWorkout then redirect ("/" <> "?success=true") else displayPage $ errorPage "error creating workout"
+          case createdWorkout of
+            Right _ -> redirect ("/" <> "?success=true")
+            Left err -> displayPage $ errorPage err
 
     post "/api/update-workout" $ do
       let parseInput :: Text -> Text -> Either Text (Int, Day)
@@ -194,17 +197,10 @@ mkApp conn =
       positions <- params
       let exercisePositionTuples = ensureAscendingPositions $ parsePositionExerciseIdTuples positions
        in do
-            result <- liftIO $ updatePositionsOfExercises conn exercisePositionTuples
-            case result of
-              Just _ -> do
-                -- NOTE: could just pass the 'workoutId' via path or also post
-                -- param. For now just query for the workoutId of any given
-                -- exercise (all belong to the same exercise).
-                exerciseEither <- liftIO $ getExerciseById conn $ snd $ head exercisePositionTuples
-                case exerciseEither of
-                  Right exercise -> redirect ("/workouts/" <> pack (show $ exerciseWorkoutId exercise) <> "/show?success=true")
-                  Left err -> displayPage $ errorPage err
-              Nothing -> displayPage $ errorPage "error updating the exercises"
+            resultEither <- liftIO $ updatePositionsOfExercises conn exercisePositionTuples
+            case resultEither of
+              Right exerciseList -> redirect ("/workouts/" <> pack (show $ exerciseWorkoutId $ NE.head exerciseList) <> "/show?success=true")
+              Left err -> displayPage $ errorPage err
 
     post "/api/update-exercise" $ do
       let parseInput :: Text -> Text -> Text -> Text -> Text -> Either Text (Int, [Int], Int, [Int], Int)
@@ -244,10 +240,10 @@ mkApp conn =
           case mkExercise exerciseId title reps note position workoutId weights of
             Left err -> displayPage $ errorPage err
             Right exercise -> do
-              deletedExercise <- liftIO $ deleteExerciseById conn exercise
-              case deletedExercise of
-                Just x -> redirect ("/workouts/" <> pack (show workoutId) <> "/show?success=true")
-                Nothing -> displayPage $ errorPage "error deleting exercise"
+              deletedExerciseEither <- liftIO $ deleteExerciseById conn exercise
+              case deletedExerciseEither of
+                Right deletedExercise -> redirect ("/workouts/" <> pack (show workoutId) <> "/show?success=true")
+                Left err -> displayPage $ errorPage err
 
 -- TODO: later use newtype wrapper
 type Position = Int

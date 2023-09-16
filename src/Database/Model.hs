@@ -17,11 +17,14 @@ import Database.PostgreSQL.Simple.ToRow (ToRow (toRow))
 import Database.PostgreSQL.Simple.Types (PGArray (PGArray))
 import GHC.Generics (Generic)
 
--- We add an exception for the case "trying to delete an entity from the
--- database and deleting 0 rows"
-data CustomDbException = NoDeletedRows deriving (Show)
+-- We add an exception for the case "trying to delete rowsfrom the
+-- database and deleting 0 rows" and "trying to update rows and updating 0 rows"
+data CustomDbException = NoDeletedRows Text | FailedUpdate Text | FailedCreate Text deriving (Exception)
 
-instance Exception CustomDbException
+instance Show CustomDbException where
+  show (NoDeletedRows err) = show $ "Deleted a row failed. More info: " <> err
+  show (FailedUpdate err) = show $ "Updating a row failed. More info: " <> err
+  show (FailedCreate err) = show $ "Creating a row failed. More info: " <> err
 
 type ExerciseId = Int
 

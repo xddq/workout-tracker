@@ -1,6 +1,3 @@
--- for deriving ToRow
-{-# LANGUAGE DeriveAnyClass #-}
-{-# LANGUAGE DeriveGeneric #-}
 -- to use "" for Text
 {-# LANGUAGE OverloadedStrings #-}
 
@@ -24,7 +21,6 @@ module Database.DB
     getExercisesForWorkout,
     getExerciseById,
     deleteExerciseById,
-    updatePositionOfExercise,
     updatePositionsOfExercises,
     deleteWorkoutWithExercises,
     mkCreateExerciseInput,
@@ -39,20 +35,20 @@ module Database.DB
     updateExercise,
     repsToText,
     weightsToText,
-    maybeToRight,
   )
 where
 
 import Control.Exception (Exception, Handler (Handler), SomeException (SomeException), catch, catches, throw)
 import Data.ByteString (ByteString)
+import Data.Either (isLeft)
 import Data.Int (Int64)
-import Data.List (sortBy, sortOn)
+import Data.List (find, sortBy, sortOn)
+import qualified Data.List.NonEmpty as NE
 import Data.Maybe (fromMaybe, listToMaybe)
 import Data.Text.Lazy (Text, pack, unpack)
 import Data.Time (Day)
--- import everything from our module Database.Model
 import Database.Model
-import Database.PostgreSQL.Simple (Connection, FromRow, Only (Only), ResultError (ConversionFailed), SomePostgreSqlException (SomePostgreSqlException), ToRow, execute, executeMany, query, query_, withTransaction)
+import Database.PostgreSQL.Simple (Connection, FromRow, Only (Only), ResultError (ConversionFailed), SomePostgreSqlException (SomePostgreSqlException), ToRow, execute, executeMany, query, query_, returning, withTransaction)
 import Database.PostgreSQL.Simple.FromField (Field (typeOid), FromField (..), returnError)
 import Database.PostgreSQL.Simple.FromRow (FromRow (fromRow), field)
 import Database.PostgreSQL.Simple.ToField (ToField (toField))
@@ -60,17 +56,8 @@ import Database.PostgreSQL.Simple.ToRow (ToRow (toRow))
 import Database.PostgreSQL.Simple.TypeInfo
 import Database.PostgreSQL.Simple.TypeInfo.Static (int4Oid, typoid)
 import Database.PostgreSQL.Simple.Types (PGArray (PGArray))
+import Database.Util
 import GHC.Generics (Generic)
-
--- using Either Text [Workout] here to be able to use the catchDbExceptions
--- function similar to the other functions
-unsafeGetWorkouts :: Connection -> IO (Either Text [Workout])
-unsafeGetWorkouts conn = do
-  workouts <- query_ conn "SELECT * FROM workouts ORDER BY date DESC" :: IO [Workout]
-  return $ Right workouts
-
-getWorkouts :: Connection -> IO (Either Text [Workout])
-getWorkouts conn = catchDbExceptions (unsafeGetWorkouts conn)
 
 unsafeGetWorkoutById :: Connection -> Int -> IO (Either Text Workout)
 unsafeGetWorkoutById conn x = do
@@ -103,25 +90,30 @@ getExercisesForWorkout conn id = catchDbExceptions (unsafeGetExercisesForWorkout
 unsafeGetExerciseById :: Connection -> Int -> IO (Either Text Exercise)
 unsafeGetExerciseById conn id = do
   exercise <- query conn "SELECT * FROM exercises WHERE id = ?" (Only id)
-  return $ maybeToRight "no exercise was found" $ listToMaybe exercise
+  return $ maybeToEither "no exercise was found" $ listToMaybe exercise
 
 getExerciseById :: Connection -> Int -> IO (Either Text Exercise)
 getExerciseById conn id = catchDbExceptions (unsafeGetExerciseById conn id)
 
--- TODO: start and stop transaction here
 {- Deletes the given exercises and updates the positions of all exercises that
  - are left for the given workout. Ensures that exercises always have 'position'
- - from 1 to N where N is the last element of the list of exercises.
+ - from 1 to N where N is the last element of the list of exercises. Executed
+ - within a transaction. If anything fails, a rollback is run (due to
+ - withTransaction).
  -}
-deleteExerciseById :: Connection -> Exercise -> IO (Maybe Exercise)
-deleteExerciseById conn x = do
+unsafeDeleteExerciseById :: Connection -> Exercise -> IO (Either Text Exercise)
+unsafeDeleteExerciseById conn x = withTransaction conn $ do
   deletedExercises <- query conn "DELETE FROM exercises WHERE id = ? RETURNING *" (Only $ exerciseId x) :: IO [Exercise]
   case listToMaybe deletedExercises of
-    Nothing -> return Nothing
+    -- throwing exception here for automated rollback
+    Nothing -> throw $ NoDeletedRows $ "Deleting exercise with id: " <> pack (show $ exerciseId x) <> " failed"
     Just deletedExercise -> do
       Right exercises <- getExercisesForWorkout conn $ exerciseWorkoutId x
       updatedExercises <- mapM (updateExercise conn) (updatePriority $ sortExercises exercises)
-      return $ Just deletedExercise
+      case find isLeft updatedExercises of
+        -- throwing exception here for automated rollback
+        Just (Left err) -> throw $ FailedUpdate err
+        _ -> return $ Right deletedExercise
   where
     sortExercises = sortOn exercisePosition
     -- TODO: how could we write this in a shorter notation? I want to create a
@@ -131,35 +123,28 @@ deleteExerciseById conn x = do
     -- position 1, second entry -> position 2 etc..
     updatePriority = zipWith (\pos x -> Exercise (exerciseId x) (exerciseTitle x) (exerciseReps x) (exerciseNote x) pos (exerciseWorkoutId x) (exerciseWeightsInKg x)) [1 ..]
 
--- Wrapper to catch db exceptions and instead return an Either
-catchDbExceptions :: IO (Either Text a) -> IO (Either Text a)
-catchDbExceptions f =
-  catches
-    f
-    [ Handler handleCustomDbException,
-      Handler handleSomePostgresqlException
-    ]
-  where
-    handleCustomDbException :: CustomDbException -> IO (Either Text a)
-    handleCustomDbException e = do
-      let err = show e
-      putStrLn err
-      return $ Left $ pack err
-    handleSomePostgresqlException :: SomePostgreSqlException -> IO (Either Text a)
-    handleSomePostgresqlException e = do
-      let err = show e
-      putStrLn err
-      return $ Left $ pack err
+deleteExerciseById :: Connection -> Exercise -> IO (Either Text Exercise)
+deleteExerciseById conn x = catchDbExceptions (unsafeDeleteExerciseById conn x)
 
 unsafeDeleteWorkoutWithExercises :: Connection -> Int -> IO (Either Text Int64)
 unsafeDeleteWorkoutWithExercises conn workoutId = withTransaction conn $ do
   execute conn "DELETE FROM exercises WHERE workout_id = ?" (Only workoutId)
   deletedRowCount <- execute conn "DELETE FROM workouts WHERE id = ?" (Only workoutId)
   -- throwing exception here for automated rollback
-  if deletedRowCount == 0 then throw NoDeletedRows else return $ Right deletedRowCount
+  if deletedRowCount == 0 then throw $ NoDeletedRows $ "Deleting workout with id: " <> pack (show workoutId) <> " failed." else return $ Right deletedRowCount
 
 deleteWorkoutWithExercises :: Connection -> Int -> IO (Either Text Int64)
 deleteWorkoutWithExercises conn workoutId = catchDbExceptions (unsafeDeleteWorkoutWithExercises conn workoutId)
+
+-- using Either Text [Workout] here to be able to use the catchDbExceptions
+-- function similar to the other functions
+unsafeGetWorkouts :: Connection -> IO (Either Text [Workout])
+unsafeGetWorkouts conn = do
+  workouts <- query_ conn "SELECT * FROM workouts ORDER BY date DESC" :: IO [Workout]
+  return $ Right workouts
+
+getWorkouts :: Connection -> IO (Either Text [Workout])
+getWorkouts conn = catchDbExceptions (unsafeGetWorkouts conn)
 
 -- When creating an exercise the user should not think about its position, it is
 -- rather just appended to the end of the list of exercises.
@@ -175,7 +160,6 @@ unsafeGetHighestPositionByWorkoutId conn workoutId = do
 getHighestPositionByWorkoutId :: Connection -> Int -> IO (Either Text Int)
 getHighestPositionByWorkoutId conn workoutId = catchDbExceptions (unsafeGetHighestPositionByWorkoutId conn workoutId)
 
--- The create exercise functions which throws exceptions.
 unsafeCreateExercise :: Connection -> CreateExerciseInput -> IO (Either Text Exercise)
 unsafeCreateExercise conn (CreateExerciseInput title reps note position workoutId weights) = do
   result <- query conn "INSERT INTO exercises (title, reps, note, position, workout_id, weight_in_kg) VALUES (?,?,?,?,?,?) RETURNING *" (title, reps, note, position, workoutId, weights)
@@ -187,7 +171,6 @@ unsafeCreateExercise conn (CreateExerciseInput title reps note position workoutI
       print "error"
       return $ Left "Error creating the exercise. The 'returning *' gave us an empty list."
 
--- trying out catching exceptions and using either type under the hood.
 createExercise :: Connection -> CreateExerciseInput -> IO (Either Text Exercise)
 createExercise conn x = catchDbExceptions (unsafeCreateExercise conn x)
 
@@ -201,46 +184,38 @@ unsafeUpdateExercise conn (Exercise id title reps note position workoutId weight
 updateExercise :: Connection -> Exercise -> IO (Either Text Exercise)
 updateExercise conn x = catchDbExceptions (unsafeUpdateExercise conn x)
 
--- TODO/MAYBE (low prio): Adapt all the other db call functions to also use an
--- unsafe version and adapt the normal version to return Either Text a. Did this
--- for some (e.g. unsafeDeleteWorkoutWithExercises) and understood the approach
--- and concept (which was my goal).
-createWorkout :: Connection -> CreateWorkoutInput -> IO (Maybe Workout)
-createWorkout conn x = do
+unsafeCreateWorkout :: Connection -> CreateWorkoutInput -> IO (Either Text Workout)
+unsafeCreateWorkout conn x = withTransaction conn $ do
   createdWorkout <- query conn "INSERT INTO workouts (type, date, note) VALUES (?,?,?) RETURNING *" (createWorkoutInputType x, createWorkoutInputDate x, createWorkoutInputNote x) :: IO [Workout]
-  case listToMaybe createdWorkout of
-    Nothing -> return Nothing
-    Just workout -> do
+  case listToEither "Creating workout failed" createdWorkout of
+    Left err -> return $ Left err
+    Right workout ->
       if createWorkoutInputPrefillWorkoutId x == -1
-        then return (Just workout)
+        then return $ Right workout
         else do
+          -- short circuit by matching on Right and return the Left when we have no match (select failed)
           Right exercises <- getExercisesForWorkout conn (createWorkoutInputPrefillWorkoutId x)
-          mapM_ (createExercise conn) (map (exerciseToCreateExerciseInput $ workoutId workout) exercises)
-          return $ Just workout
+          createdExercises <- mapM (createExercise conn) (map (exerciseToCreateExerciseInput $ workoutId workout) exercises)
+          case find isLeft createdExercises of
+            -- throwing exception here for automated rollback
+            Just (Left err) -> throw $ FailedCreate err
+            _ -> return $ Right workout
   where
     exerciseToCreateExerciseInput workoutId ex = CreateExerciseInput (exerciseTitle ex) (exerciseReps ex) (exerciseNote ex) (exercisePosition ex) workoutId (exerciseWeightsInKg ex)
+
+createWorkout :: Connection -> CreateWorkoutInput -> IO (Either Text Workout)
+createWorkout conn x = catchDbExceptions (unsafeCreateWorkout conn x)
 
 -- TODO: later use newtype wrapper?
 type Position = Int
 
-updatePositionOfExercise :: Connection -> (Position, ExerciseId) -> IO (Maybe Exercise)
-updatePositionOfExercise conn (position, id) = do
-  result <- query conn "UPDATE exercises SET position=? WHERE id=? RETURNING *" (position, id) :: IO [Exercise]
-  return $ listToMaybe result
+-- Using NonEmpty list here in order to store our evidence (list contains > 0 elements) in the type to avoid having to recheck the result of this function for this case once again.
+unsafeUpdatePositionsOfExercises :: Connection -> [(Position, ExerciseId)] -> IO (Either Text (NE.NonEmpty Exercise))
+unsafeUpdatePositionsOfExercises conn xs = do
+  exercises <- returning conn "UPDATE exercises SET position = upd.position FROM (VALUES (?,?)) as upd(position,id) WHERE exercises.id = upd.id" xs :: IO [Exercise]
+  case maybeToEither "Updating did not update any exercise." $ NE.nonEmpty exercises of
+    Right exerciseList -> return $ Right exerciseList
+    Left err -> return $ Left err
 
-updatePositionsOfExercises :: Connection -> [(Position, ExerciseId)] -> IO (Maybe Int)
-updatePositionsOfExercises conn xs = do
-  rowsAffected <- executeMany conn "UPDATE exercises SET position = upd.position FROM (VALUES (?,?)) as upd(position,id) WHERE exercises.id = upd.id" xs :: IO Int64
-  if rowsAffected == 0 then return Nothing else return $ Just $ fromIntegral rowsAffected
-
-repsToText :: PGArray Int -> String
-repsToText (PGArray xs) = foldl (\acc curr -> if null acc then show curr else acc ++ "," ++ show curr) "" xs
-
-weightsToText :: PGArray Int -> String
-weightsToText = repsToText
-
--- TODO: perhaps move this into a util package..? Or decide which other
--- package to install and to import it from..?
-maybeToRight :: Text -> Maybe a -> Either Text a
-maybeToRight err Nothing = Left err
-maybeToRight _ (Just x) = Right x
+updatePositionsOfExercises :: Connection -> [(Position, ExerciseId)] -> IO (Either Text (NE.NonEmpty Exercise))
+updatePositionsOfExercises conn xs = catchDbExceptions (unsafeUpdatePositionsOfExercises conn xs)

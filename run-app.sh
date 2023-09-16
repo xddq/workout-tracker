@@ -11,4 +11,4 @@ dbmate create
 dbmate up
 
 echo "$(date) - Starting app"
-cabal run todo-app
+cabal run app

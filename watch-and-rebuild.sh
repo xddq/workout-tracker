@@ -1,5 +1,5 @@
 #!/bin/bash
 
-sh -c "cabal run todo-app &"
+sh -c "cabal run app &"
 
-while inotifywait -qq -r -e modify ./app/* ./src/* ; do killall todo-app; sh -c "cabal run todo-app &" ; done
+while inotifywait -qq -r -e modify ./app/* ./src/* ; do killall app; sh -c "cabal run app &" ; done
