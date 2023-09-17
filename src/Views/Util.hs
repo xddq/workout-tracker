@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Views.Util (errorPage, backToHomePageSnippet, successSnippet, makeHtmlHead, Success, Page, mkCurrentDate, mkTitle, Title, CurrentDate, htmlToText, successPage) where
+module Views.Util where
 
 import Data.Text.Lazy (Text)
 import Data.Time (Day, defaultTimeLocale, formatTime)
@@ -85,3 +85,9 @@ charactersAfterDot str =
 
 htmlToText :: Html -> Text
 htmlToText = renderHtml
+
+repsToText :: [Int] -> String
+repsToText = foldl (\acc curr -> if null acc then show curr else acc ++ "," ++ show curr) ""
+
+weightsToText :: [Int] -> String
+weightsToText = repsToText

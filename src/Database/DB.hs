@@ -33,8 +33,6 @@ module Database.DB
     createExerciseInputWeightsInKg,
     createExercise,
     updateExercise,
-    repsToText,
-    weightsToText,
   )
 where
 
@@ -191,7 +189,7 @@ unsafeCreateWorkout conn x = withTransaction conn $ do
             Just (Left err) -> throw $ FailedCreate err
             _ -> return $ Right workout
   where
-    exerciseToCreateExerciseInput workoutId ex = CreateExerciseInput (exerciseTitle ex) (exerciseReps ex) (exerciseNote ex) (exercisePosition ex) workoutId (exerciseWeightsInKg ex)
+    exerciseToCreateExerciseInput workoutId ex = CreateExerciseInput (exerciseTitle ex) (PGArray $ exerciseReps ex) (exerciseNote ex) (exercisePosition ex) workoutId (PGArray $ exerciseWeightsInKg ex)
 
 createWorkout :: Connection -> CreateWorkoutInput -> IO (Either Text Workout)
 createWorkout conn x = catchDbExceptions (unsafeCreateWorkout conn x)

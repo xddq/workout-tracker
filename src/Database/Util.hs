@@ -39,13 +39,3 @@ catchDbExceptions f =
       let err = show e
       putStrLn err
       return $ Left $ pack err
-
--- TODO: Should probably be inside the view utils..? But I don't want to have to
--- import Database stuff there. Perhaps adapt the Model of Exercise to be [Int]
--- for reps and weights to work around this..?! Will have to adapt fromRow and
--- toRow instance then I think.
-repsToText :: PGArray Int -> String
-repsToText (PGArray xs) = foldl (\acc curr -> if null acc then show curr else acc ++ "," ++ show curr) "" xs
-
-weightsToText :: PGArray Int -> String
-weightsToText = repsToText

@@ -1,6 +1,8 @@
 -- for deriving ToRow
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
+-- for allowing to create an instance for FromRow with [Int] instead of [a]
+{-# LANGUAGE FlexibleInstances #-}
 -- to use "" for Text
 {-# LANGUAGE OverloadedStrings #-}
 
@@ -8,13 +10,15 @@
 module Database.Model where
 
 import Control.Exception (Exception)
+import qualified Data.ByteString as B
 import Data.Text.Lazy (Text, pack, unpack)
 import Data.Time (Day)
-import Database.PostgreSQL.Simple.FromField (Field (typeOid), FromField (..), returnError)
+import Database.PostgreSQL.Simple.FromField (Conversion, Field (typeOid), FromField (..), ResultError (Incompatible, UnexpectedNull), TypeInfo (typoid), returnError)
 import Database.PostgreSQL.Simple.FromRow (FromRow (fromRow), field)
 import Database.PostgreSQL.Simple.ToField (ToField (toField))
 import Database.PostgreSQL.Simple.ToRow (ToRow (toRow))
-import Database.PostgreSQL.Simple.Types (PGArray (PGArray))
+import Database.PostgreSQL.Simple.TypeInfo.Static (array_int4, int4)
+import Database.PostgreSQL.Simple.Types (PGArray (PGArray, fromPGArray))
 import GHC.Generics (Generic)
 
 -- We add an exception for the case "trying to delete rowsfrom the
@@ -52,7 +56,7 @@ mkExercise id title reps note position workoutId weightsInKg = do
   -- TODO: do we have to use the parseReps and parsedWeights in order to have
   -- the short circuiting? Or is using a tuple with matchall (_,_) enough?
   (parsedReps, parsedWeights) <- parseRepsAndWeights reps weightsInKg
-  return $ Exercise id title (PGArray parsedReps) note position workoutId (PGArray parsedWeights)
+  return $ Exercise id title parsedReps note position workoutId parsedWeights
 
 -- Ensures that if we pass a different amount of sets based on reps and weights,
 -- we get an error. If we pass for one of them a list with a single value, we
@@ -66,19 +70,59 @@ parseRepsAndWeights reps weights = if length reps == length weights then Right (
 data Exercise = Exercise
   { exerciseId :: Int,
     exerciseTitle :: Text,
-    exerciseReps :: PGArray Int,
+    exerciseReps :: [Int],
     exerciseNote :: Text,
     exercisePosition :: Int,
     exerciseWorkoutId :: Int,
-    exerciseWeightsInKg :: PGArray Int
+    exerciseWeightsInKg :: [Int]
   }
-  deriving (Show, Generic, FromRow, ToRow)
+  deriving (Show, Generic)
+
+instance ToRow Exercise where
+  toRow exercise =
+    [ toField (exerciseId exercise),
+      toField (exerciseTitle exercise),
+      toField (exerciseReps exercise),
+      toField (exerciseNote exercise),
+      toField (exercisePosition exercise),
+      toField (exerciseWorkoutId exercise),
+      toField (exerciseWeightsInKg exercise)
+    ]
+
+-- NOTE: Order matters here. SQL statements also have to return exercises with columns in this order
+instance FromRow Exercise where
+  fromRow =
+    Exercise
+      <$> field -- exerciseId
+      <*> field -- exerciseTitle
+      <*> field -- exerciseReps
+      <*> field -- exerciseNote
+      <*> field -- exercisePosition
+      <*> field -- exerciseWorkoutId
+      <*> field -- exerciseWeightsInKg
+
+instance FromField [Int] where
+  fromField f mdata =
+    -- check if type is what we expect it to be
+    if typeOid f /= typoid array_int4
+      then returnError Incompatible f ""
+      else do
+        pgArray <- fromField f mdata :: Conversion (PGArray Int)
+        return $ fromPGArray pgArray
+
+instance ToField [Int] where
+  -- wrap with PGArray when storing [Int] in db
+  toField = toField . PGArray
 
 mkCreateExerciseInput :: ExerciseTitle -> ExerciseReps -> ExerciseNote -> ExercisePosition -> ExerciseWorkoutId -> ExerciseWeightsInKg -> Either Text CreateExerciseInput
 mkCreateExerciseInput title reps note position workoutId weights = do
   (parsedReps, parsedWeights) <- parseRepsAndWeights reps weights
   return $ CreateExerciseInput title (PGArray parsedReps) note position workoutId (PGArray parsedWeights)
 
+-- NOTE: Could also use custom instances with [Int] instead of PGArray Int here.
+-- Currently not needed since we don't operate on this data in other logic
+-- layers of our app (e.g. views, webapp/routing). If needed, just do similar to
+-- Exercise above.
 data CreateExerciseInput = CreateExerciseInput
   { createExerciseInputTitle :: Text,
     createExerciseInputReps :: PGArray Int,

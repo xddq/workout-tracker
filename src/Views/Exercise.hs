@@ -3,11 +3,11 @@
 module Views.Exercise (editExercisePage, showOrderExercisesPage, deleteExercisePage, addExerciseSnippet, displayExerciseListSnippet) where
 
 import Data.Text.Lazy (Text, pack)
-import Database.DB (Exercise, Workout, exerciseId, exerciseNote, exercisePosition, exerciseReps, exerciseTitle, exerciseWeightsInKg, exerciseWorkoutId, repsToText, weightsToText, workoutId)
+import Database.DB (Exercise, Workout, exerciseId, exerciseNote, exercisePosition, exerciseReps, exerciseTitle, exerciseWeightsInKg, exerciseWorkoutId, workoutId)
 import Text.Blaze.Html (Html)
 import Text.Blaze.Html5 as H
 import Text.Blaze.Html5.Attributes as A
-import Views.Util (backToHomePageSnippet, errorPage, makeHtmlHead, mkTitle)
+import Views.Util
 
 showOrderExercisesPage :: Either Text [Exercise] -> Html
 showOrderExercisesPage (Right xs) = docTypeHtml $ do
@@ -151,5 +151,4 @@ displayOrderExerciseListItemSnippet exercise = do
   H.tr $ do
     H.td $ H.div ! class_ "control" $ input ! class_ "input" ! type_ "number" ! name "position[]" ! required "" ! value (toValue $ exercisePosition exercise) ! A.min "1"
     H.td $ toHtml $ exerciseTitle exercise
-    H.td $ toHtml $ repsToText $ exerciseReps exercise
   input ! type_ "hidden" ! name "exerciseId[]" ! value (toValue $ exerciseId exercise)
