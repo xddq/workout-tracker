@@ -83,9 +83,6 @@ charactersAfterDot str =
     [] -> 0 -- If there is no dot, return 0.
     dotStr -> length (tail dotStr) -- Get the length of characters after the dot.
 
-htmlToText :: Html -> Text
-htmlToText = renderHtml
-
 repsToText :: [Int] -> String
 repsToText = foldl (\acc curr -> if null acc then show curr else acc ++ "," ++ show curr) ""
 

@@ -21,6 +21,9 @@ import Database.PostgreSQL.Simple.TypeInfo.Static (array_int4, int4)
 import Database.PostgreSQL.Simple.Types (PGArray (PGArray, fromPGArray))
 import GHC.Generics (Generic)
 
+-- TODO: perhaps define model as separate module..? And here only add the
+-- FromRow and ToRow etc. instances..?
+
 -- We add an exception for the case "trying to delete rowsfrom the
 -- database and deleting 0 rows" and "trying to update rows and updating 0 rows"
 data CustomDbException = NoDeletedRows Text | FailedUpdate Text | FailedCreate Text deriving (Exception)

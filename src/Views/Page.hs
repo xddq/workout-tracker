@@ -11,11 +11,10 @@ module Views.Page
     showOrderExercisesPage,
     editExercisePage,
     deleteExercisePage,
-    htmlToText,
     mkCurrentDate,
   )
 where
 
 import Views.Exercise (deleteExercisePage, editExercisePage, showOrderExercisesPage)
-import Views.Util (CurrentDate, Success, Title, errorPage, htmlToText, makeHtmlHead, mkCurrentDate, mkTitle, successPage, successSnippet)
+import Views.Util (CurrentDate, Success, Title, errorPage, makeHtmlHead, mkCurrentDate, mkTitle, successPage, successSnippet)
 import Views.Workout (addWorkoutSnippet, deleteWorkoutPage, displayWorkoutListSnippet, editWorkoutPage, landingPage, showWorkoutPage)

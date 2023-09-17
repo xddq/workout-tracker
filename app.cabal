@@ -7,7 +7,7 @@ Category:            Web
 
 library webapp
   exposed-modules:     Webapp
-  other-modules:       Views.Util, Views.Page, Views.Workout, Views.Exercise, Database.DB, Database.Model, Database.Util
+  other-modules:       Views.Util, Views.Page, Views.Workout, Views.Exercise, Database.DB, Database.Model, Database.Util, Controllers.Workout, Controllers.Exercise, Controllers.Util, Controllers.Controller
   hs-source-dirs:      src
   default-language:    Haskell2010
   build-depends:       base >= 4.16 && < 4.17,
@@ -28,10 +28,29 @@ library webapp
                        mtl == 2.3.1,
                        -- our database
                        database,
+                       -- our controllers
+                       controllers,
                        blaze-html == 0.9.1.2,
                        -- our views
                        views,
                        time == 1.12.2,
+
+library controllers
+  exposed-modules:     Controllers.Controller
+  other-modules:       Controllers.Workout, Controllers.Exercise, Controllers.Util, Database.DB, Database.Model, Database.Util, Views.Exercise, Views.Page, Views.Util, Views.Workout
+  hs-source-dirs:      src
+  default-language:    Haskell2010
+  build-depends:       base >= 4.16 && < 4.17,
+                       base-compat >= 0.12 && < 0.13,
+                       postgresql-simple == 0.7.0.0,
+                       blaze-html == 0.9.1.2,
+                       scotty == 0.12.1,
+                       http-types == 0.12.3,
+                       text == 1.2.5.0,
+                       time == 1.12.2,
+                       bytestring == 0.11.4.0,
+                       -- for monad transformers
+                       mtl == 2.3.1
 
 library database
   exposed-modules:     Database.DB
