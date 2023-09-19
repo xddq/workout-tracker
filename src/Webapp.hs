@@ -27,33 +27,21 @@ import Network.Wai.Middleware.RequestLogger (logStdoutDev)
 import Network.Wai.Middleware.Static (addBase, staticPolicy)
 import Text.Blaze.Html (Html)
 import Text.Read (readMaybe)
-import Views.Page (deleteExercisePage, deleteWorkoutPage, editExercisePage, editWorkoutPage, errorPage, landingPage, mkCurrentDate, showOrderExercisesPage, showWorkoutPage, successPage)
 import Web.Scotty (ActionM, Param, Parsable (parseParam), body, defaultHandler, delete, get, html, middleware, param, params, patch, post, readEither, redirect, rescue, scottyApp, setHeader, status, text)
 
 mkApp :: Connection -> IO Application
 mkApp conn =
   scottyApp $ do
     -- Add any WAI middleware, they are run top-down.
-    -- log all requests in console
+    -- logs all requests in console
     middleware logStdoutDev
-    -- serve static files from the "static" directory
+    -- serves static files from the "static" directory
     middleware $ staticPolicy (addBase "static")
 
-    -- catchall error handler. Used to display errors occuring inside API
-    -- controllers.
-    defaultHandler $ \e -> do
-      status status400
-      -- TODO: don't expose displayPage here. rather implement the defaulthandle
-      -- defaulthandler in controllers I gues..?!
-      Controllers.displayPage $ errorPage e
+    -- catchall error handler. Displays errors occuring inside API controllers.
+    defaultHandler Controllers.customErrorHandler
 
-    get "/" $ do
-      success <- param "success" `rescue` (\_ -> return False)
-      currentDate <- liftIO (utctDay <$> getCurrentTime)
-      workoutsEither <- liftIO (getWorkouts conn)
-      -- TODO: don't expose displayPage here. rather implement the landingPage
-      -- in controllers I gues..?!
-      Controllers.displayPage $ landingPage success (mkCurrentDate currentDate) workoutsEither
+    get "/" $ Controllers.landingPage conn
 
     get "/workouts/:id/edit" $ Controllers.updateWorkout conn
     get "/workouts/:id/show" $ Controllers.readWorkout conn

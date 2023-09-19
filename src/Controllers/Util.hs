@@ -5,8 +5,10 @@ module Controllers.Util where
 import Data.Text.Lazy (Text, split, unpack)
 import qualified Data.Text.Lazy as T
 import Data.Time (Day, UTCTime (utctDay), defaultTimeLocale, formatTime, getCurrentTime, parseTimeM)
+import Network.HTTP.Types (status400)
 import Text.Blaze.Html (Html)
 import Text.Blaze.Html.Renderer.Text (renderHtml)
+import Views.Page (errorPage)
 import Web.Scotty (ActionM, defaultHandler, param, raise, readEither, redirect, rescue, setHeader, status, text)
 
 htmlToText :: Html -> Text
