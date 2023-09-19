@@ -48,6 +48,9 @@ mkApp conn =
     get "/workouts/:id/delete" $ Controllers.deleteWorkout conn
     get "/workouts/:id/exercises/order" $ Controllers.orderWorkoutExercises conn
 
+    -- NOTE: using create update delete API routes with POST instead of
+    -- PATCH/PUT or DELETE since we are using html and css only and html forms
+    -- only support GET and POST verbs.
     post "/api/create-workout" $ Controllers.apiCreateWorkout conn
     post "/api/update-workout" $ Controllers.apiUpdateWorkout conn
     post "/api/delete-workout" $ Controllers.apiDeleteWorkout conn
