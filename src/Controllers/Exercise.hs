@@ -18,14 +18,36 @@ import Views.Page
 import Web.Scotty (ActionM, Param, defaultHandler, param, params, raise, readEither, redirect, rescue, setHeader, status, text)
 import Web.Scotty.Internal.Types (ActionT, ScottyError, ScottyT)
 
+-- The code of the functions so no jumping around is needed to understand the
+-- problem.
+-- unsafeGetExerciseById :: Connection -> Int -> IO (Either Text Exercise)
+-- unsafeGetExerciseById conn id = do
+--   exercise <- query conn "SELECT * FROM exercises WHERE id = ?" (Only id)
+--   return $ maybeToEither "no exercise was found" $ listToMaybe exercise
+--
+-- getExerciseById :: Connection -> Int -> IO (Either Text Exercise)
+-- getExerciseById conn id = catchDbExceptions (unsafeGetExerciseById conn id)
+
+-- textToEitherInt :: Text -> Either Text Int
+-- textToEitherInt = readEither
+
 updateExercise :: Connection -> ActionM ()
 updateExercise conn = do
   unparsedId <- param "id"
-  case textToEitherInt unparsedId of
-    Left err -> displayPage $ errorPage err
-    Right parsedExerciseId -> do
-      exerciseEither <- liftIO (DB.getExerciseById conn parsedExerciseId)
-      displayPage $ editExercisePage exerciseEither
+  -- let finalEither1 = textToEitherInt unparsedId >>= (\id -> DB.getExerciseById conn id)
+  -- let finalEither2 = textToEitherInt unparsedId >>= DB.getExerciseById conn
+  let finalEither3 = textToEitherInt unparsedId >>= (\id -> liftIO $ DB.getExerciseById conn id)
+  -- TODO: How can I combine/chain `textToEitherInt unparsedId` with `DB.getExerciseById conn` here?
+  -- editExercisePage takes value of type `Either Text Exercise`
+  displayPage $ editExercisePage finalEither3
+
+-- case textToEitherInt unparsedId of
+--   Left err -> displayPage $ errorPage err
+--   Right parsedExerciseId -> do
+--     exerciseEither <- liftIO (DB.getExerciseById conn parsedExerciseId)
+--     displayPage $ editExercisePage exerciseEither
+
+-- getExerciseById ::
 
 deleteExercise :: Connection -> ActionM ()
 deleteExercise conn = do
