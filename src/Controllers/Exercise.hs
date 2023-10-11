@@ -3,6 +3,8 @@
 module Controllers.Exercise where
 
 import Control.Monad.IO.Class (MonadIO (liftIO))
+import Control.Monad.Trans (lift)
+import Control.Monad.Trans.Except (ExceptT(..), except)
 import Controllers.Util
 import Data.List (sortOn)
 import qualified Data.List.NonEmpty as NE
@@ -19,22 +21,16 @@ import Web.Scotty (ActionM, Param, defaultHandler, param, params, raise, readEit
 import Web.Scotty.Internal.Types (ActionT, ScottyError, ScottyT)
 
 updateExercise :: Connection -> ActionM ()
-updateExercise conn = do
-  unparsedId <- param "id"
-  case textToEitherInt unparsedId of
-    Left err -> displayPage $ errorPage err
-    Right parsedExerciseId -> do
-      exerciseEither <- liftIO (DB.getExerciseById conn parsedExerciseId)
-      displayPage $ editExercisePage exerciseEither
+updateExercise conn = leftToErrorPage $ do
+  parsedExerciseId <- ExceptT $ textToEitherInt <$> param "id"
+  exercise <- ExceptT $ liftIO (DB.getExerciseById conn parsedExerciseId)
+  lift $ displayPage $ editExercisePage exercise
 
 deleteExercise :: Connection -> ActionM ()
-deleteExercise conn = do
-  unparsedId <- param "id"
-  case textToEitherInt unparsedId of
-    Left err -> text $ htmlToText (errorPage err)
-    Right parsedExerciseId -> do
-      exerciseEither <- liftIO (DB.getExerciseById conn parsedExerciseId)
-      displayPage $ deleteExercisePage exerciseEither
+deleteExercise conn = leftToErrorPage $ do
+  parsedExerciseId <- ExceptT $ textToEitherInt <$> param "id"
+  exerciseEither <- ExceptT $ liftIO (DB.getExerciseById conn parsedExerciseId)
+  lift $ displayPage $ deleteExercisePage exerciseEither
 
 -- API controllers execute business logic and once done redirect to another
 -- route. Api controllers 'raise' errors which will get caught by the default
@@ -49,22 +45,17 @@ apiCreateExercise conn = do
   unparsedWorkoutId <- param "workoutId"
   case parseInput unparsedReps unparsedWeights unparsedWorkoutId of
     Left err -> displayPage $ errorPage err
-    Right (reps, weights, workoutId) -> do
-      position <- liftIO $ DB.getHighestPositionByWorkoutId conn workoutId
-      case position of
-        Left err -> raise err
-        Right position -> do
-          case DB.mkCreateExerciseInput title reps note position workoutId weights of
-            Left err -> raise err
-            Right createExerciseInput -> do
-              createdExerciseEither <- liftIO $ DB.createExercise conn createExerciseInput
-              case createdExerciseEither of
-                Left err -> raise err
-                Right createdExercise -> redirect ("/workouts/" <> pack (show $ DB.exerciseWorkoutId createdExercise) <> "/show?success=true")
+    Right (reps, weights, workoutId) -> leftToRaise $ do
+      position <- ExceptT $ liftIO $ DB.getHighestPositionByWorkoutId conn workoutId
+      createExerciseInput <- except $ DB.mkCreateExerciseInput title reps note position workoutId weights
+      createdExercise <- ExceptT $ liftIO $ DB.createExercise conn createExerciseInput
+      lift $ redirect ("/workouts/" <> pack (show $ DB.exerciseWorkoutId createdExercise) <> "/show?success=true")
   where
     parseInput :: Text -> Text -> Text -> Either Text ([Int], [Int], Int)
     parseInput unparsedReps unparsedWeights unparsedWorkoutId = do
       (,,) <$> textToEitherIntList unparsedReps <*> textToEitherIntList unparsedWeights <*> textToEitherInt unparsedWorkoutId
+
+    leftToRaise (ExceptT e) = e >>= either raise pure
 
 apiUpdateExercises :: Connection -> ActionM ()
 apiUpdateExercises conn = do

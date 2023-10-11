@@ -9,25 +9,22 @@ import Text.Blaze.Html5 as H
 import Text.Blaze.Html5.Attributes as A
 import Views.Util
 
-showOrderExercisesPage :: Either Text [Exercise] -> Html
-showOrderExercisesPage (Right xs) = docTypeHtml $ do
+showOrderExercisesPage :: [Exercise] -> Html
+showOrderExercisesPage xs = docTypeHtml $ do
   makeHtmlHead $ mkTitle "Order Exercises"
   body $ do
     backToHomePageSnippet
     displayOrderExerciseListSnippet xs
-showOrderExercisesPage (Left err) = errorPage err
 
-editExercisePage :: Either Text Exercise -> Html
-editExercisePage (Right exercise) = docTypeHtml $ do
+editExercisePage :: Exercise -> Html
+editExercisePage exercise = docTypeHtml $ do
   makeHtmlHead $ mkTitle "Edit Exercise"
   body $ editExerciseSnippet exercise
-editExercisePage (Left err) = errorPage err
 
-deleteExercisePage :: Either Text Exercise -> Html
-deleteExercisePage (Right exercise) = docTypeHtml $ do
+deleteExercisePage :: Exercise -> Html
+deleteExercisePage exercise = docTypeHtml $ do
   makeHtmlHead $ mkTitle "Delete Exercise"
   body $ deleteExerciseSnippet exercise
-deleteExercisePage (Left err) = errorPage err
 
 -- TODO: rename to "createX" to use same naming as in the api routes.
 addExerciseSnippet :: Workout -> Html

@@ -11,17 +11,16 @@ import Text.Blaze.Html5.Attributes as A
 import Views.Exercise (addExerciseSnippet, displayExerciseListSnippet)
 import Views.Util (CurrentDate, Success, backToHomePageSnippet, errorPage, makeHtmlHead, mkCurrentDate, mkTitle, successSnippet)
 
-landingPage :: Success -> CurrentDate -> Either Text [Workout] -> Html
-landingPage s date (Right workouts) = docTypeHtml $ do
+landingPage :: Success -> CurrentDate -> [Workout] -> Html
+landingPage s date workouts = docTypeHtml $ do
   makeHtmlHead $ mkTitle "Workout Tracker"
   body $ do
     successSnippet s
     addWorkoutSnippet date workouts
     displayWorkoutListSnippet date workouts
-landingPage _ _ (Left err) = errorPage err
 
-showWorkoutPage :: Success -> Workout -> Either Text [Exercise] -> Html
-showWorkoutPage s workout (Right exercises) = docTypeHtml $ do
+showWorkoutPage :: Success -> Workout -> [Exercise] -> Html
+showWorkoutPage s workout exercises = docTypeHtml $ do
   makeHtmlHead $ mkTitle "Show Workout"
   body $ do
     successSnippet s
@@ -29,19 +28,16 @@ showWorkoutPage s workout (Right exercises) = docTypeHtml $ do
     displayExerciseListSnippet exercises
     backToHomePageSnippet
     addExerciseSnippet workout
-showWorkoutPage _ _ (Left err) = errorPage err
 
-deleteWorkoutPage :: Either Text Workout -> Html
-deleteWorkoutPage (Right workout) = docTypeHtml $ do
+deleteWorkoutPage :: Workout -> Html
+deleteWorkoutPage workout = docTypeHtml $ do
   makeHtmlHead $ mkTitle "Delete Workout"
   body $ deleteWorkoutSnippet workout
-deleteWorkoutPage (Left err) = errorPage err
 
-editWorkoutPage :: Either Text Workout -> Html
-editWorkoutPage (Right workout) = docTypeHtml $ do
+editWorkoutPage :: Workout -> Html
+editWorkoutPage workout = docTypeHtml $ do
   makeHtmlHead $ mkTitle "Edit Workout"
   body $ editWorkoutSnippet workout
-editWorkoutPage (Left err) = errorPage err
 
 deleteWorkoutSnippet :: Workout -> Html
 deleteWorkoutSnippet x = do

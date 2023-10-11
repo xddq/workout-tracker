@@ -2,6 +2,7 @@
 
 module Controllers.Util where
 
+import Control.Monad.Trans.Except (ExceptT, runExceptT)
 import Data.Text.Lazy (Text, split, unpack)
 import qualified Data.Text.Lazy as T
 import Data.Time (Day, UTCTime (utctDay), defaultTimeLocale, formatTime, getCurrentTime, parseTimeM)
@@ -24,6 +25,9 @@ textToEitherIntList txt = mapM readEither $ textToList txt
     textToList = split (== ',')
     readEitherToInt :: Text -> Either Text Int
     readEitherToInt = readEither
+
+leftToErrorPage :: ExceptT Text ActionM () -> ActionM ()
+leftToErrorPage e = runExceptT e >>= either (displayPage . errorPage) pure 
 
 displayPage :: Html -> ActionM ()
 displayPage x = do

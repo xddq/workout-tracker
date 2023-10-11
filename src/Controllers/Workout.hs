@@ -3,6 +3,8 @@
 module Controllers.Workout where
 
 import Control.Monad.IO.Class (MonadIO (liftIO))
+import Control.Monad.Trans (lift)
+import Control.Monad.Trans.Except (ExceptT(..), except)
 import Controllers.Util
 import Data.Text.Lazy (Text, unpack)
 import qualified Data.Text.Lazy as T
@@ -16,47 +18,33 @@ import Web.Scotty (ActionM, defaultHandler, param, raise, readEither, redirect, 
 import Web.Scotty.Internal.Types (ActionT, ScottyError, ScottyT)
 
 readWorkout :: Connection -> ActionM ()
-readWorkout conn = do
-  unparsedId <- param "id"
+readWorkout conn = leftToErrorPage $ do
+  unparsedId <- lift $ param "id"
   -- success is an optional param. therefore using rescue to avoid throwing the
   -- exception up in case the optional param was not given.
-  success <- param "success" `rescue` (\_ -> return False)
-  case textToEitherInt unparsedId of
-    Left err -> displayPage $ errorPage err
-    Right parsedWorkoutId -> do
-      workoutEither <- liftIO (DB.getWorkoutById conn parsedWorkoutId)
-      case workoutEither of
-        Left err -> displayPage $ errorPage err
-        Right workout -> do
-          exercisesEither <- liftIO (DB.getExercisesForWorkout conn (DB.workoutId workout))
-          displayPage $ showWorkoutPage success workout exercisesEither
+  success <- lift $ param "success" `rescue` (\_ -> return False)
+  parsedWorkoutId <- except $ textToEitherInt unparsedId
+  workout <- ExceptT $ liftIO (DB.getWorkoutById conn parsedWorkoutId)
+  exercises <- ExceptT $ liftIO (DB.getExercisesForWorkout conn (DB.workoutId workout))
+  lift $ displayPage $ showWorkoutPage success workout exercises
 
 updateWorkout :: Connection -> ActionM ()
-updateWorkout conn = do
-  unparsedId <- param "id"
-  case textToEitherInt unparsedId of
-    Left err -> displayPage $ errorPage err
-    Right id -> do
-      workoutEither <- liftIO (DB.getWorkoutById conn id)
-      displayPage $ editWorkoutPage workoutEither
+updateWorkout conn = leftToErrorPage $ do
+  id <- ExceptT $ textToEitherInt <$> param "id"
+  workout <- ExceptT $ liftIO (DB.getWorkoutById conn id)
+  lift $ displayPage $ editWorkoutPage workout
 
 deleteWorkout :: Connection -> ActionM ()
-deleteWorkout conn = do
-  unparsedWorkoutId <- param "id"
-  case textToEitherInt unparsedWorkoutId of
-    Left err -> displayPage $ errorPage err
-    Right workoutId -> do
-      workoutEither <- liftIO (DB.getWorkoutById conn workoutId)
-      displayPage $ deleteWorkoutPage workoutEither
+deleteWorkout conn = leftToErrorPage $ do
+  workoutId <- ExceptT $ textToEitherInt <$> param "id"
+  workout <- ExceptT $ liftIO (DB.getWorkoutById conn workoutId)
+  lift $ displayPage $ deleteWorkoutPage workout
 
 orderWorkoutExercises :: Connection -> ActionM ()
-orderWorkoutExercises conn = do
-  unparsedWorkoutId <- param "id"
-  case textToEitherInt unparsedWorkoutId of
-    Left err -> displayPage $ errorPage err
-    Right workoutId -> do
-      exercisesEither <- liftIO (DB.getExercisesForWorkout conn workoutId)
-      displayPage $ showOrderExercisesPage exercisesEither
+orderWorkoutExercises conn = leftToErrorPage $ do
+  workoutId <- ExceptT $ textToEitherInt <$> param "id"
+  exercises <- ExceptT $ liftIO (DB.getExercisesForWorkout conn workoutId)
+  lift $ displayPage $ showOrderExercisesPage exercises
 
 -- API controllers execute business logic and once done redirect to another
 -- route. Api controllers 'raise' errors which will get caught by the default
