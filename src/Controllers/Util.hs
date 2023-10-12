@@ -30,6 +30,9 @@ displayPage x = do
   setHeader "Content-Type" "text/html; charset=utf-8"
   text $ htmlToText x
 
+displayErrorPage :: Text -> ActionM ()
+displayErrorPage = displayPage . errorPage
+
 textToDate :: Text -> Either Text Day
 textToDate txt = do
   let parsedMaybe = parseTimeM True defaultTimeLocale dateFormat $ unpack txt

@@ -122,6 +122,7 @@ unsafeDeleteExerciseById conn x = withTransaction conn $ do
 deleteExerciseById :: Connection -> Exercise -> IO (Either Text Exercise)
 deleteExerciseById conn x = catchDbExceptions (unsafeDeleteExerciseById conn x)
 
+-- TODO: return the deleted workout here..?
 unsafeDeleteWorkoutWithExercises :: Connection -> Int -> IO (Either Text Int64)
 unsafeDeleteWorkoutWithExercises conn workoutId = withTransaction conn $ do
   execute conn "DELETE FROM exercises WHERE workout_id = ?" (Only workoutId)

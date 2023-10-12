@@ -9,13 +9,12 @@ import Text.Blaze.Html5 as H
 import Text.Blaze.Html5.Attributes as A
 import Views.Util
 
-showOrderExercisesPage :: Either Text [Exercise] -> Html
-showOrderExercisesPage (Right xs) = docTypeHtml $ do
+showOrderExercisesPage :: [Exercise] -> Html
+showOrderExercisesPage exercises = docTypeHtml $ do
   makeHtmlHead $ mkTitle "Order Exercises"
   body $ do
     backToHomePageSnippet
-    displayOrderExerciseListSnippet xs
-showOrderExercisesPage (Left err) = errorPage err
+    displayOrderExerciseListSnippet exercises
 
 editExercisePage :: Either Text Exercise -> Html
 editExercisePage (Right exercise) = docTypeHtml $ do

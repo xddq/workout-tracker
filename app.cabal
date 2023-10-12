@@ -12,74 +12,25 @@ library webapp
   default-language:    Haskell2010
   build-depends:       base >= 4.16 && < 4.17,
                        base-compat >= 0.12 && < 0.13,
+                       text == 1.2.5.0,
+                       time == 1.12.2,
+                       aeson == 2.1.2.1,
+                       aeson-qq == 0.8.4,
+                       bytestring == 0.11.4.0,
+                       -- for database access
                        postgresql-simple == 0.7.0.0,
+                       -- for webserver
                        scotty == 0.12.1,
                        wai == 3.2.3,
                        wai-cors == 0.2.7,
                        wai-extra == 3.1.13.0,
                        wai-middleware-static == 0.9.2,
-                       warp == 3.3.28,
+                       warp == 3.3.29,
                        http-types == 0.12.3,
-                       text == 1.2.5.0,
-                       aeson == 2.1.2.1,
-                       aeson-qq == 0.8.4,
-                       bytestring == 0.11.4.0,
+                       -- for views/html
+                       blaze-html == 0.9.1.2,
                        -- for monad transformers
                        mtl == 2.3.1,
-                       -- our database
-                       database,
-                       -- our controllers
-                       controllers,
-                       blaze-html == 0.9.1.2,
-                       -- our views
-                       views,
-                       time == 1.12.2,
-
-library controllers
-  exposed-modules:     Controllers.Controller
-  other-modules:       Controllers.Workout, Controllers.Exercise, Controllers.Util, Database.DB, Database.Model, Database.Util, Views.Exercise, Views.Page, Views.Util, Views.Workout
-  hs-source-dirs:      src
-  default-language:    Haskell2010
-  build-depends:       base >= 4.16 && < 4.17,
-                       base-compat >= 0.12 && < 0.13,
-                       postgresql-simple == 0.7.0.0,
-                       blaze-html == 0.9.1.2,
-                       scotty == 0.12.1,
-                       http-types == 0.12.3,
-                       text == 1.2.5.0,
-                       time == 1.12.2,
-                       bytestring == 0.11.4.0,
-                       -- for monad transformers
-                       mtl == 2.3.1
-
-library database
-  exposed-modules:     Database.DB
-  other-modules:       Database.Model, Database.Util
-  hs-source-dirs:      src
-  default-language:    Haskell2010
-  build-depends:       base >= 4.16 && < 4.17,
-                       base-compat >= 0.12 && < 0.13,
-                       postgresql-simple == 0.7.0.0,
-                       text == 1.2.5.0,
-                       time == 1.12.2,
-                       bytestring == 0.11.4.0,
-                       -- for monad transformers
-                       mtl == 2.3.1
-
-library views
-  exposed-modules:     Views.Page
-  other-modules:       Views.Util, Views.Workout, Views.Exercise, Database.DB, Database.Model, Database.Util
-  hs-source-dirs:      src
-  default-language:    Haskell2010
-  build-depends:       base >= 4.16 && < 4.17,
-                       base-compat >= 0.12 && < 0.13,
-                       blaze-html == 0.9.1.2,
-                       text == 1.2.5.0,
-                       -- for type of purchase
-                       database,
-                       time == 1.12.2,
-                       bytestring == 0.11.4.0,
-                       postgresql-simple == 0.7.0.0,
 
 executable app
   main-is:             Main.hs
@@ -90,7 +41,7 @@ executable app
   build-depends:       base >= 4.16 && < 4.17,
                        base-compat >= 0.12 && < 0.13,
                        postgresql-simple == 0.7.0.0,
-                       warp == 3.3.28,
+                       warp == 3.3.29,
                        -- reading from .env file
                        dotenv ==  0.11.0.2,
                        -- our webapp
