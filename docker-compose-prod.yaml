@@ -31,6 +31,7 @@ services:
 
 volumes:
   todo-db:
+  db-backup:
 
 networks:
   # name of your reverse proxy network
