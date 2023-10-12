@@ -85,9 +85,8 @@ apiUpdateWorkout conn = do
 
 apiDeleteWorkout :: Connection -> ActionM ()
 apiDeleteWorkout conn = do
-  unparsedWorkoutId <- param "workoutId"
   deletedRowsEither <- runExceptT $ do
-    workoutId <- ExceptT $ pure $ textToEitherInt unparsedWorkoutId
+    workoutId <- ExceptT $ textToEitherInt <$> param "workoutId"
     ExceptT $ liftIO $ DB.deleteWorkoutWithExercises conn workoutId
   either displayErrorPage displayLandingPage deletedRowsEither
   where

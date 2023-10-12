@@ -56,8 +56,8 @@ apiCreateExercise conn = do
     parseInput unparsedReps unparsedWeights unparsedWorkoutId = do
       (,,) <$> textToEitherIntList unparsedReps <*> textToEitherIntList unparsedWeights <*> textToEitherInt unparsedWorkoutId
 
-apiUpdateExercises :: Connection -> ActionM ()
-apiUpdateExercises conn = do
+apiUpdateExercisePositions :: Connection -> ActionM ()
+apiUpdateExercisePositions conn = do
   -- we pass position(first) exerciseId(second) multiple times (once per
   -- exercise) and read them out via 'params'.
   positions <- params
@@ -91,17 +91,9 @@ apiUpdateExercise conn = do
 
 apiDeleteExercise :: Connection -> ActionM ()
 apiDeleteExercise conn = do
-  unparsedExerciseId <- param "id"
-  title <- param "title"
-  unparsedReps <- param "reps"
-  note <- param "note"
-  unparsedPosition <- param "position"
-  unparsedWeights <- param "weightsInKg"
-  unparsedWorkoutId <- param "workoutId"
   deletedExerciseEither <- runExceptT $ do
-    (exerciseId, reps, position, weights, workoutId) <- ExceptT $ pure $ parseInput unparsedExerciseId unparsedReps unparsedPosition unparsedWeights unparsedWorkoutId
-    exercise <- ExceptT $ pure $ DB.mkExercise exerciseId title reps note position workoutId weights
-    ExceptT $ liftIO $ DB.deleteExerciseById conn exercise
+    exerciseId <- ExceptT $ textToEitherInt <$> param "id"
+    ExceptT $ liftIO $ DB.deleteExerciseById conn exerciseId
   either displayErrorPage displayWorkout deletedExerciseEither
   where
     parseInput :: Text -> Text -> Text -> Text -> Text -> Either Text (Int, [Int], Int, [Int], Int)

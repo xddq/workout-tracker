@@ -1,9 +1,9 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Controllers.Controller (readWorkout, updateWorkout, deleteWorkout, orderWorkoutExercises, apiCreateWorkout, apiUpdateWorkout, apiDeleteWorkout, updateExercise, deleteExercise, apiCreateExercise, apiUpdateExercises, apiUpdateExercise, apiDeleteExercise, displayPage, customErrorHandler, showLandingPage) where
+module Controllers.Controller (readWorkout, updateWorkout, deleteWorkout, orderWorkoutExercises, apiCreateWorkout, apiUpdateWorkout, apiDeleteWorkout, updateExercise, deleteExercise, apiCreateExercise, apiUpdateExercisePositions, apiUpdateExercise, apiDeleteExercise, displayPage, customErrorHandler, showLandingPage) where
 
 import Control.Monad.IO.Class (MonadIO (liftIO))
-import Controllers.Exercise (apiCreateExercise, apiDeleteExercise, apiUpdateExercise, apiUpdateExercises, deleteExercise, updateExercise)
+import Controllers.Exercise (apiCreateExercise, apiDeleteExercise, apiUpdateExercise, apiUpdateExercisePositions, deleteExercise, updateExercise)
 import Controllers.Util (displayPage, displayErrorPage)
 import Controllers.Workout (apiCreateWorkout, apiDeleteWorkout, apiUpdateWorkout, deleteWorkout, orderWorkoutExercises, readWorkout, updateWorkout)
 import Data.Text.Lazy (Text, split, unpack)

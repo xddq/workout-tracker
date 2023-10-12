@@ -97,14 +97,14 @@ getExerciseById conn id = catchDbExceptions (unsafeGetExerciseById conn id)
  - within a transaction. If anything fails, a rollback is run (due to
  - withTransaction).
  -}
-unsafeDeleteExerciseById :: Connection -> Exercise -> IO (Either Text Exercise)
-unsafeDeleteExerciseById conn x = withTransaction conn $ do
-  deletedExercises <- query conn "DELETE FROM exercises WHERE id = ? RETURNING *" (Only $ exerciseId x) :: IO [Exercise]
+unsafeDeleteExerciseById :: Connection -> Int -> IO (Either Text Exercise)
+unsafeDeleteExerciseById conn id = withTransaction conn $ do
+  deletedExercises <- query conn "DELETE FROM exercises WHERE id = ? RETURNING *" (Only id) :: IO [Exercise]
   case listToMaybe deletedExercises of
     -- throwing exception here for automated rollback
-    Nothing -> throw $ NoDeletedRows $ "Deleting exercise with id: " <> pack (show $ exerciseId x) <> " failed"
+    Nothing -> throw $ NoDeletedRows $ "Deleting exercise with id: " <> pack (show id) <> " failed"
     Just deletedExercise -> do
-      Right exercises <- getExercisesForWorkout conn $ exerciseWorkoutId x
+      Right exercises <- getExercisesForWorkout conn $ exerciseWorkoutId deletedExercise
       updatedExercises <- mapM (updateExercise conn) (updatePriority $ sortExercises exercises)
       case find isLeft updatedExercises of
         -- throwing exception here for automated rollback
@@ -119,18 +119,18 @@ unsafeDeleteExerciseById conn x = withTransaction conn $ do
     -- position 1, second entry -> position 2 etc..
     updatePriority = zipWith (\pos x -> Exercise (exerciseId x) (exerciseTitle x) (exerciseReps x) (exerciseNote x) pos (exerciseWorkoutId x) (exerciseWeightsInKg x)) [1 ..]
 
-deleteExerciseById :: Connection -> Exercise -> IO (Either Text Exercise)
-deleteExerciseById conn x = catchDbExceptions (unsafeDeleteExerciseById conn x)
+deleteExerciseById :: Connection -> Int -> IO (Either Text Exercise)
+deleteExerciseById conn id = catchDbExceptions (unsafeDeleteExerciseById conn id)
 
--- TODO: return the deleted workout here..?
-unsafeDeleteWorkoutWithExercises :: Connection -> Int -> IO (Either Text Int64)
+unsafeDeleteWorkoutWithExercises :: Connection -> Int -> IO (Either Text Workout)
 unsafeDeleteWorkoutWithExercises conn workoutId = withTransaction conn $ do
-  execute conn "DELETE FROM exercises WHERE workout_id = ?" (Only workoutId)
-  deletedRowCount <- execute conn "DELETE FROM workouts WHERE id = ?" (Only workoutId)
-  -- throwing exception here for automated rollback
-  if deletedRowCount == 0 then throw $ NoDeletedRows $ "Deleting workout with id: " <> pack (show workoutId) <> " failed." else return $ Right deletedRowCount
+  _deletedExercises <- query conn "DELETE FROM exercises WHERE workout_id = ? RETURNING *" (Only workoutId) :: IO [Exercise]
+  deletedWorkouts <- query conn "DELETE FROM workouts WHERE id = ? RETURNING *" (Only workoutId) :: IO [Workout]
+  -- Throwing exception here for automated rollback to restore exercises in case
+  -- deleting the workout failed.
+  if null deletedWorkouts then throw $ NoDeletedRows $ "Deleting workout with id: " <> pack (show workoutId) <> " failed." else return $ Right $ head deletedWorkouts
 
-deleteWorkoutWithExercises :: Connection -> Int -> IO (Either Text Int64)
+deleteWorkoutWithExercises :: Connection -> Int -> IO (Either Text Workout)
 deleteWorkoutWithExercises conn workoutId = catchDbExceptions (unsafeDeleteWorkoutWithExercises conn workoutId)
 
 -- using Either Text [Workout] here to be able to use the catchDbExceptions

@@ -38,8 +38,6 @@ mkApp conn =
     get "/exercises/:id/delete" $ Controllers.deleteExercise conn
 
     post "/api/create-exercise" $ Controllers.apiCreateExercise conn
-    -- TODO: perhaps rename to updateExercisePositions
-    -- bulk updates exercises, used for updating their position/order
-    post "/api/update-exercises" $ Controllers.apiUpdateExercises conn
     post "/api/update-exercise" $ Controllers.apiUpdateExercise conn
+    post "/api/update-exercise-positions" $ Controllers.apiUpdateExercisePositions conn
     post "/api/delete-exercise" $ Controllers.apiDeleteExercise conn

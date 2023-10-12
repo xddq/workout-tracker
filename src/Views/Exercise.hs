@@ -133,7 +133,7 @@ displayOrderExerciseListSnippet xs =
       "Um die Reihenfolge der Übungen anzupassen muss man die Werte der Spalte "
       strong "Pos"
       " (Position) anpassen. Es darf keine Position doppelt vergeben werden. Positionen werden der Reihe nach (von klein nach groß) angezeigt. Also zuerst die Übung mit Position 1, dann die Übung mit Position 2, etc."
-    H.form ! target "_self" ! action "/api/update-exercises" ! method "post" $ do
+    H.form ! target "_self" ! action "/api/update-exercise-positions" ! method "post" $ do
       H.div ! class_ "table-container" $ do
         table ! class_ "table" $ do
           thead $ tr $ do
