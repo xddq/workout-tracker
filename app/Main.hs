@@ -15,5 +15,6 @@ main = do
   host <- getEnv "DB_HOST"
   conn <- connect defaultConnectInfo {connectHost = host, connectDatabase = "todo-app", connectUser = "psql", connectPassword = "psql"}
   waiApp <- mkApp conn
-  putStrLn "Running app on localhost:3000"
-  run 3000 waiApp
+  let webserverPort = 3000 :: Int
+  putStrLn $ "Running app on localhost:" ++ show webserverPort
+  run webserverPort waiApp

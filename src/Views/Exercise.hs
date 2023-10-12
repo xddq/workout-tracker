@@ -16,17 +16,15 @@ showOrderExercisesPage exercises = docTypeHtml $ do
     backToHomePageSnippet
     displayOrderExerciseListSnippet exercises
 
-editExercisePage :: Either Text Exercise -> Html
-editExercisePage (Right exercise) = docTypeHtml $ do
+editExercisePage :: Exercise -> Html
+editExercisePage exercise = docTypeHtml $ do
   makeHtmlHead $ mkTitle "Edit Exercise"
   body $ editExerciseSnippet exercise
-editExercisePage (Left err) = errorPage err
 
-deleteExercisePage :: Either Text Exercise -> Html
-deleteExercisePage (Right exercise) = docTypeHtml $ do
+deleteExercisePage :: Exercise -> Html
+deleteExercisePage exercise = docTypeHtml $ do
   makeHtmlHead $ mkTitle "Delete Exercise"
   body $ deleteExerciseSnippet exercise
-deleteExercisePage (Left err) = errorPage err
 
 -- TODO: rename to "createX" to use same naming as in the api routes.
 addExerciseSnippet :: Workout -> Html

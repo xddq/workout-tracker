@@ -20,7 +20,7 @@ mkApp conn =
     -- catchall error handler
     defaultHandler Controllers.customErrorHandler
 
-    get "/" $ Controllers.landingPage conn
+    get "/" $ Controllers.showLandingPage conn
 
     get "/workouts/:id/edit" $ Controllers.updateWorkout conn
     get "/workouts/:id/show" $ Controllers.readWorkout conn

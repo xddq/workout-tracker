@@ -11,14 +11,13 @@ import Text.Blaze.Html5.Attributes as A
 import Views.Exercise (addExerciseSnippet, displayExerciseListSnippet)
 import Views.Util (CurrentDate, Success, backToHomePageSnippet, errorPage, makeHtmlHead, mkCurrentDate, mkTitle, successSnippet)
 
-landingPage :: Success -> CurrentDate -> Either Text [Workout] -> Html
-landingPage s date (Right workouts) = docTypeHtml $ do
+landingPage :: Success -> CurrentDate -> [Workout] -> Html
+landingPage s date workouts = docTypeHtml $ do
   makeHtmlHead $ mkTitle "Workout Tracker"
   body $ do
     successSnippet s
     addWorkoutSnippet date workouts
     displayWorkoutListSnippet date workouts
-landingPage _ _ (Left err) = errorPage err
 
 showWorkoutPage :: Success -> Workout -> [Exercise] -> Html
 showWorkoutPage s workout exercises = docTypeHtml $ do

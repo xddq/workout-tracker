@@ -27,14 +27,14 @@ updateExercise conn = do
     -- NOTE: how it would look like with explicit return
     -- exercise <- ExceptT $ liftIO $ DB.getExerciseById conn exerciseId
     -- return exercise
-  displayPage $ editExercisePage exerciseEither
+  either displayErrorPage (displayPage . editExercisePage) exerciseEither
 
 deleteExercise :: Connection -> ActionM ()
 deleteExercise conn = do
   exerciseEither <- runExceptT $ do
     exerciseId <- ExceptT $ textToEitherInt <$> param "id"
     ExceptT $ liftIO $ DB.getExerciseById conn exerciseId
-  displayPage $ deleteExercisePage exerciseEither
+  either displayErrorPage (displayPage . deleteExercisePage) exerciseEither
 
 -- API controllers are called when we trying to mutate the database/state.
 apiCreateExercise :: Connection -> ActionM ()
