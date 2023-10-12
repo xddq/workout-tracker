@@ -10,6 +10,7 @@ services:
       - POSTGRES_PASSWORD=psql
     volumes:
       - todo-db:/var/lib/postgresql/data
+      - db-backup:/db-backup
     networks:
       - internal
 

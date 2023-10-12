@@ -93,3 +93,23 @@ something confusing about "todo-app" in this code it is because I started with
 the previous small project
 [haskell-simple-todo](https://github.com/xddq/haskell-simple-todo) as baseline
 and did not bother to adapt it in all places.
+
+## Backups
+
+- to set up a cron for automated daily backups stored in aws s3 do the following:
+- install aws cli on remote server
+- create ~/.aws/credentials file and add data for the account (should be a
+  separate user with only access to the bucket)
+- make script executable `chmod +x ./backup.sh`
+- create cronjob `crontab -e`
+
+## Docker builder cache
+
+- When running a lot of ci cd on a server the docker builder cache quickly fills
+  up the storage of the server. To avoid this, make sure you have something like
+
+```
+# cleans docker build cache once a week to not go out of storage to quick
+* * 1 * * docker builder prune --force
+```
+  in your crontab. If not, add this via `crontab -e`.
