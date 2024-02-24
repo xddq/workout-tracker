@@ -24,7 +24,7 @@ docker container exec workout-tracker-postgres-1 /bin/sh -c 'rm -f /db-backup/*'
 docker container exec workout-tracker-postgres-1 /bin/sh -c 'pg_dump -U psql todo-app > "/db-backup/$(date -I).sql"'
 
 LATEST_BACKUP="$(ls -t1 /var/lib/docker/volumes/workout-tracker_db-backup/_data | head -n 1)"
-cp "/var/lib/docker/volumes/workout-tracker_db-backup/_data/$LATEST_BACKUP" "tmp-backup-$APP_NAME"
+cp "/var/lib/docker/volumes/${APP_NAME}_db-backup/_data/$LATEST_BACKUP" "tmp-backup-$APP_NAME"
 
 # compress backup
 tar -cvzf "tmp-backup-$APP_NAME.tar.gz" "tmp-backup-$APP_NAME"

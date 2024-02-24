@@ -113,3 +113,30 @@ and did not bother to adapt it in all places.
 * * 1 * * docker builder prune --force
 ```
   in your crontab. If not, add this via `crontab -e`.
+
+## Restoring db entries
+
+If you accidentally delete records they land in the deleted_records table. In
+order to restore a deleted record you take the json payloads and then inser them
+back into the according tables. Lets see a verbose step by step example for
+restoring a deleted workout which had the workout_id 40 and the corresponding
+exercises:
+
+- copy the json for the workout with workout_id 40 into a file.
+  - `\COPY (SELECT data FROM deleted_records WHERE table_name='workouts' AND object_id=40) TO '/workout_id_40.json';`
+- create a tmp table for the data `CREATE TABLE tmp_json (data jsonb);`
+- copy the file data into the table `\COPY tmp_json FROM '/workout_id_40.json'`;
+- insert the data into the workouts table
+
+```
+INSERT INTO workouts (id,type,date,note)                                                                    SELECT id,type,date,note
+FROM json_populate_record(null::workouts, (SELECT data FROM tmp_json)::json);
+```
+
+Now you want to restore all exercises for that workout. This time we take a
+shorter way, with only one command:
+
+```
+INSERT INTO exercises
+SELECT * FROM json_populate_recordset(null::exercises, (SELECT json_agg(data) FROM deleted_records WHERE data->>'workout_id'='40' AND table_name='exercises')::json);
+```
